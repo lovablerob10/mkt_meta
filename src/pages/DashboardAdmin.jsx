@@ -163,55 +163,94 @@ export default function DashboardAdmin() {
         />
       </div>
 
-      {/* Account balances */}
-      <div className="panel animate-in">
-        <div className="panel-header" style={{ alignItems: 'center', borderBottom: '1px solid rgba(80,90,107,0.3)', paddingBottom: '16px', marginBottom: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div className="panel-subtitle" style={{ color: 'var(--brand-muted)', fontWeight: 800 }}>
-              SALDO DAS CONTAS DE ANÚNCIO <span style={{ fontWeight: 500 }}>({MOCK_ACCOUNTS.length} CONTAS)</span>
+      {/* Bento Grid: Saldos + Alertas */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 'var(--space-24)', marginBottom: 'var(--space-24)' }}>
+        {/* Account balances */}
+        <div className="panel animate-in" style={{ marginBottom: 0 }}>
+          <div className="panel-header" style={{ alignItems: 'center', borderBottom: '1px solid rgba(80,90,107,0.3)', paddingBottom: '16px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div className="panel-subtitle" style={{ color: 'var(--brand-muted)', fontWeight: 800 }}>
+                SALDO DAS CONTAS DE ANÚNCIO <span style={{ fontWeight: 500 }}>({MOCK_ACCOUNTS.length} CONTAS)</span>
+              </div>
+              
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.1)',
+                color: '#EF4444',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                padding: '2px 10px',
+                borderRadius: '100px',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                <Target size={10} /> 3 sem crédito
+              </div>
             </div>
-            
-            <div style={{
-              background: 'rgba(239, 68, 68, 0.1)',
-              color: '#EF4444',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              padding: '2px 10px',
-              borderRadius: '100px',
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}>
-              <Target size={10} /> 3 sem crédito
+            <button className="btn btn-ghost btn-sm" style={{ gap: '6px', padding: '4px 12px' }}>
+               <RefreshCw size={12} /> Atualizar 
+            </button>
+          </div>
+          <div className="billing-grid">
+            {MOCK_ACCOUNTS.map((acc) => (
+              <div key={acc.id} className="billing-card">
+                <div className="billing-card-name">{acc.name}</div>
+                <div className={`billing-card-balance ${
+                  acc.balance === 0 ? 'empty' :
+                  acc.balance < 100 ? 'low' : 'positive'
+                }`}>
+                  {fmtCurrency(acc.balance)}
+                </div>
+                <div className={`status-badge ${
+                  acc.status === 'empty' ? 'bad' :
+                  acc.status === 'low' ? 'warning' : 'good'
+                }`}>
+                  <span className="status-dot" />
+                  {acc.status === 'empty' ? 'Sem crédito' :
+                   acc.status === 'low' ? 'Crédito baixo' : 'Ativo'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Alertas Prioritários */}
+        <div className="alerts-panel animate-in">
+          <div className="alerts-panel-title">Alertas Prioritários</div>
+
+          <div className="alert-item">
+            <div className="alert-icon error">
+              <TrendingUp size={14} />
+            </div>
+            <div>
+              <div className="alert-title">Fadiga Criativa: MC Cortinas</div>
+              <div className="alert-desc">CTR caiu 45% nas últimas 24h. Ação sugerida: rotacionar criativos.</div>
             </div>
           </div>
-          <button className="btn btn-ghost btn-sm" style={{ gap: '6px', padding: '4px 12px' }}>
-             <RefreshCw size={12} /> Atualizar 
-          </button>
-        </div>
-        <div className="billing-grid">
-          {MOCK_ACCOUNTS.map((acc) => (
-            <div key={acc.id} className="billing-card">
-              <div className="billing-card-name">{acc.name}</div>
-              <div className={`billing-card-balance ${
-                acc.balance === 0 ? 'empty' :
-                acc.balance < 100 ? 'low' : 'positive'
-              }`}>
-                {fmtCurrency(acc.balance)}
-              </div>
-              <div className={`status-badge ${
-                acc.status === 'empty' ? 'bad' :
-                acc.status === 'low' ? 'warning' : 'good'
-              }`}>
-                <span className="status-dot" />
-                {acc.status === 'empty' ? 'Sem crédito' :
-                 acc.status === 'low' ? 'Crédito baixo' : 'Ativo'}
-              </div>
+
+          <div className="alert-item">
+            <div className="alert-icon success">
+              <ArrowUpRight size={14} />
             </div>
-          ))}
+            <div>
+              <div className="alert-title">Oportunidade: M Politano</div>
+              <div className="alert-desc">ROAS 5.2x acima da meta. Recomendação: aumentar budget diário em 20%.</div>
+            </div>
+          </div>
+
+          <div className="alert-item">
+            <div className="alert-icon warning">
+              <Zap size={14} />
+            </div>
+            <div>
+              <div className="alert-title">Saldo Crítico: VEG Logística</div>
+              <div className="alert-desc">Saldo restante R$ 48,00. Campanha pode pausar em ~12h.</div>
+            </div>
+          </div>
         </div>
       </div>
+
 
       {/* Charts row */}
       <div className="panels-grid">
