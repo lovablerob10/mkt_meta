@@ -89,7 +89,16 @@ export default function Clients() {
           <div key={client.id} className="panel animate-in" style={{ marginBottom: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-16)' }}>
               <div>
-                <div style={{ fontWeight: 700, color: 'var(--brand-offwhite)' }}>{client.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
+                  <div style={{ fontWeight: 700, color: 'var(--brand-offwhite)' }}>{client.name}</div>
+                  <a 
+                    href={`/client?id=${client.id}`} 
+                    className="btn btn-secondary btn-sm" 
+                    style={{ padding: '2px 8px', fontSize: '10px', height: 'auto', background: 'var(--brand-surface-01)', border: '1px solid var(--brand-accent)'}}
+                  >
+                    Ver Dash <Eye size={10} style={{ marginLeft: 4 }}/>
+                  </a>
+                </div>
                 <div style={{ fontSize: 'var(--font-caption)', color: 'var(--brand-muted)' }}>
                   Desde {new Date(client.createdAt).toLocaleDateString('pt-BR')}
                 </div>

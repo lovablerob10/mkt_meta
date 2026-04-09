@@ -1,12 +1,26 @@
 import { Bell, Search, Menu } from 'lucide-react';
+import { useAuth, ROLE_PERMISSIONS } from '../contexts/AuthContext';
 
-export default function Header({ title, subtitle, onMenuToggle }) {
+export default function Header({ title, subtitle, onMenuToggle, hideMenu }) {
+  const { user } = useAuth();
+
+  const displayName = user?.name || 'Usuário';
+  const initials = displayName
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+  const roleBadge = user ? ROLE_PERMISSIONS[user.role] : null;
+
   return (
     <header className="header">
       <div className="header-left">
-        <button className="mobile-menu-btn" onClick={onMenuToggle}>
-          <Menu size={24} />
-        </button>
+        {!hideMenu && (
+          <button className="mobile-menu-btn" onClick={onMenuToggle}>
+            <Menu size={24} />
+          </button>
+        )}
         <div>
           <div className="header-breadcrumb">{subtitle}</div>
           <h2 className="header-title" dangerouslySetInnerHTML={{ __html: title }} />
@@ -25,10 +39,16 @@ export default function Header({ title, subtitle, onMenuToggle }) {
           }} />
         </button>
         <div className="header-user">
-          <div className="header-avatar">ZM</div>
+          <div className="header-avatar" style={{
+            background: roleBadge ? `${roleBadge.color}25` : undefined,
+            color: roleBadge?.color || undefined,
+            border: roleBadge ? `1px solid ${roleBadge.color}40` : undefined,
+          }}>
+            {initials}
+          </div>
           <div>
-            <div className="header-username">Zara MKT</div>
-            <div className="header-role">Administrador</div>
+            <div className="header-username">{displayName}</div>
+            <div className="header-role">{roleBadge?.label || 'Usuário'}</div>
           </div>
         </div>
       </div>

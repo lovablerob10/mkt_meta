@@ -20,7 +20,10 @@ const fmt = (n) => n ? n.toLocaleString('pt-BR') : '0';
 const fmtCurrency = (n) => n ? `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00';
 
 export default function DashboardClient() {
-  const [selectedClientId, setSelectedClientId] = useState(MOCK_CLIENTS[0].id);
+  const query = new URLSearchParams(window.location.search);
+  const initialId = query.get('id') || MOCK_CLIENTS[0].id;
+
+  const [selectedClientId, setSelectedClientId] = useState(initialId);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'leads'
 
   const client = MOCK_CLIENTS.find(c => c.id === selectedClientId) || MOCK_CLIENTS[0];

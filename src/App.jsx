@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth, ROLES } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import AIChatWidget from './components/AIChatWidget';
+import Login from './pages/Login';
 import DashboardAdmin from './pages/DashboardAdmin';
 import DashboardClient from './pages/DashboardClient';
 import Leads from './pages/Leads';
 import Clients from './pages/Clients';
+import Reports from './pages/Reports';
 import SettingsPage from './pages/Settings';
 
 // Placeholder pages
@@ -24,8 +28,6 @@ function CampaignsPage() {
   );
 }
 
-import Reports from './pages/Reports';
-
 const ROUTE_TITLES = {
   '/': { title: 'Painel <span class="accent">Administrativo</span>', sub: 'Dashboard' },
   '/client': { title: 'Dashboard do <span class="accent">Cliente</span>', sub: 'Visão do cliente' },
@@ -36,39 +38,108 @@ const ROUTE_TITLES = {
   '/settings': { title: 'Configura<span class="accent">ções</span>', sub: 'Configurações' },
 };
 
+// ────────────────────────────────────────────────────────
+// AppContent — Layout principal com sidebar e rotas protegidas
+// ────────────────────────────────────────────────────────
 function AppContent() {
+  const { user, isAuthenticated } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const path = window.location.pathname;
   const routeInfo = ROUTE_TITLES[path] || ROUTE_TITLES['/'];
 
+  // Se não está logado, qualquer rota protegida redireciona para /login
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Cliente não vê sidebar nem header admin
+  const isClienteRole = user?.role === ROLES.CLIENTE;
+
   return (
     <div className="app-layout">
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="main-area">
+      {!isClienteRole && (
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      )}
+      <div className="main-area" style={isClienteRole ? { marginLeft: 0 } : undefined}>
         <Header
           title={routeInfo.title}
           subtitle={routeInfo.sub}
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+          hideMenu={isClienteRole}
         />
         <Routes>
-          <Route path="/" element={<DashboardAdmin />} />
-          <Route path="/client" element={<DashboardClient />} />
-          <Route path="/campaigns" element={<CampaignsPage />} />
-          <Route path="/leads" element={<Leads />} />
-          <Route path="/clients" element={<Clients />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          {/* Rotas Admin/Gestor */}
+          <Route path="/" element={
+            <ProtectedRoute allowedRoles={[ROLES.MASTER, ROLES.GESTOR]}>
+              <DashboardAdmin />
+            </ProtectedRoute>
+          } />
+          <Route path="/campaigns" element={
+            <ProtectedRoute allowedRoles={[ROLES.MASTER, ROLES.GESTOR]}>
+              <CampaignsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/leads" element={
+            <ProtectedRoute allowedRoles={[ROLES.MASTER, ROLES.GESTOR]}>
+              <Leads />
+            </ProtectedRoute>
+          } />
+          <Route path="/clients" element={
+            <ProtectedRoute allowedRoles={[ROLES.MASTER, ROLES.GESTOR]}>
+              <Clients />
+            </ProtectedRoute>
+          } />
+          <Route path="/reports" element={
+            <ProtectedRoute allowedRoles={[ROLES.MASTER, ROLES.GESTOR]}>
+              <Reports />
+            </ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute allowedRoles={[ROLES.MASTER]}>
+              <SettingsPage />
+            </ProtectedRoute>
+          } />
+
+          {/* Rota do Cliente — acessível por todos */}
+          <Route path="/client" element={
+            <ProtectedRoute allowedRoles={[ROLES.MASTER, ROLES.GESTOR, ROLES.CLIENTE]}>
+              <DashboardClient />
+            </ProtectedRoute>
+          } />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to={isClienteRole ? '/client' : '/'} replace />} />
         </Routes>
       </div>
-      <AIChatWidget />
+      {!isClienteRole && <AIChatWidget />}
     </div>
   );
 }
 
+// ────────────────────────────────────────────────────────
+// App — Root com AuthProvider e Router
+// ────────────────────────────────────────────────────────
 export default function App() {
   return (
     <BrowserRouter>
-      <AppContent />
+      <AuthProvider>
+        <Routes>
+          {/* Rota pública: Login */}
+          <Route path="/login" element={<LoginGuard />} />
+
+          {/* Todas as outras rotas passam pelo AppContent */}
+          <Route path="/*" element={<AppContent />} />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   );
+}
+
+// Se já está logado e tenta ir no /login, redireciona p/ home
+function LoginGuard() {
+  const { isAuthenticated, user } = useAuth();
+  if (isAuthenticated) {
+    return <Navigate to={user?.role === ROLES.CLIENTE ? '/client' : '/'} replace />;
+  }
+  return <Login />;
 }
