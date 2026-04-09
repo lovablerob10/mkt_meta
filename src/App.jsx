@@ -24,19 +24,7 @@ function CampaignsPage() {
   );
 }
 
-function ReportsPage() {
-  return (
-    <div className="page-content">
-      <div className="page-heading animate-in">
-        <h1>Relat<span className="accent">órios</span></h1>
-        <p className="page-description">
-          Relatórios automáticos enviados via WhatsApp em PDF com as métricas configuradas.
-          <br /><em style={{ color: 'var(--brand-muted-deep)' }}>Em construção — os relatórios serão gerados automaticamente.</em>
-        </p>
-      </div>
-    </div>
-  );
-}
+import Reports from './pages/Reports';
 
 const ROUTE_TITLES = {
   '/': { title: 'Painel <span class="accent">Administrativo</span>', sub: 'Dashboard' },
@@ -68,7 +56,7 @@ function AppContent() {
           <Route path="/campaigns" element={<CampaignsPage />} />
           <Route path="/leads" element={<Leads />} />
           <Route path="/clients" element={<Clients />} />
-          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </div>

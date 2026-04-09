@@ -13,6 +13,7 @@ import {
   MOCK_DEMOGRAPHICS,
   MOCK_WEEKLY_LEADS,
   MOCK_DAILY_PERFORMANCE,
+  MOCK_LEADS,
 } from '../data/mockData';
 
 const fmt = (n) => n ? n.toLocaleString('pt-BR') : '0';
@@ -20,8 +21,12 @@ const fmtCurrency = (n) => n ? `R$ ${n.toLocaleString('pt-BR', { minimumFraction
 
 export default function DashboardClient() {
   const [selectedClientId, setSelectedClientId] = useState(MOCK_CLIENTS[0].id);
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'leads'
+
   const client = MOCK_CLIENTS.find(c => c.id === selectedClientId) || MOCK_CLIENTS[0];
   const activeCampaign = MOCK_CAMPAIGNS.find(c => c.account === client.name);
+  const clientLeads = MOCK_LEADS.filter(lead => lead.clientName === client.name);
+
   return (
     <div className="page-content">
       {/* Dev Switcher - Só para visualizarmos os templates diferentes */}
@@ -37,15 +42,35 @@ export default function DashboardClient() {
          </select>
       </div>
 
-      {/* Welcome banner */}
-      <div className="page-heading animate-in">
-        <h1>
-          Olá, <span className="accent">{client.name}</span> 👋
-        </h1>
-        <p className="page-description">
-          Aqui está o resumo em tempo real da sua performance de {client.dashboardConfig.type === 'branding' ? 'Marca e Reconhecimento' : 'Vendas e Captação'}.
-        </p>
+      {/* Tabs Menu */}
+      <div style={{ display: 'flex', gap: 'var(--space-16)', marginBottom: 'var(--space-24)', borderBottom: '1px solid var(--border-subtle)', paddingBottom: 'var(--space-8)' }}>
+        <button 
+          className={`filter-chip ${activeTab === 'overview' ? 'active' : ''}`}
+          onClick={() => setActiveTab('overview')}
+        >
+          Visão Geral
+        </button>
+        {client.dashboardConfig.type !== 'branding' && (
+          <button 
+            className={`filter-chip ${activeTab === 'leads' ? 'active' : ''}`}
+            onClick={() => setActiveTab('leads')}
+          >
+            Central de Leads
+          </button>
+        )}
       </div>
+
+      {activeTab === 'overview' ? (
+        <>
+          {/* Welcome banner */}
+          <div className="page-heading animate-in">
+            <h1>
+              Olá, <span className="accent">{client.name}</span> 👋
+            </h1>
+            <p className="page-description">
+              Aqui está o resumo em tempo real da sua performance de {client.dashboardConfig.type === 'branding' ? 'Marca e Reconhecimento' : 'Vendas e Captação'}.
+            </p>
+          </div>
 
       {/* Dynamic Hero KPIs based on Client Config */}
       <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
@@ -363,6 +388,47 @@ Qualquer dúvida, converse com nossa IA aqui no dashboard ou me chame! 🚀
           Atualizado em 08/04/2026, 14:30
         </div>
       </div>
+          </>
+        ) : (
+          <div className="animate-in">
+            <div className="page-heading">
+              <h1>Sua <span className="accent">Central de Leads</span></h1>
+              <p className="page-description">Acompanhe as oportunidades geradas pelas suas campanhas recentes.</p>
+            </div>
+            
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 'var(--space-16)'
+            }}>
+              {clientLeads.map((lead) => (
+                <div key={lead.id} className="panel" style={{ marginBottom: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-16)' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 'var(--font-body-md)', color: 'var(--brand-offwhite)' }}>
+                        {lead.name}
+                      </div>
+                      <div style={{ fontSize: 'var(--font-caption)', color: 'var(--brand-muted)', marginTop: 4 }}>
+                        {lead.campaign}
+                      </div>
+                    </div>
+                    <span className={`status-badge ${lead.status === 'new' ? 'good' : lead.status === 'converted' ? 'good' : 'warning'}`}>
+                      <span className="status-dot" />
+                      {lead.status === 'new' ? 'Novo' : lead.status === 'converted' ? 'Convertido' : 'Contatado'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 'var(--font-body-sm)', color: 'var(--brand-offwhite-80)' }}>
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}><MessageCircle size={14} style={{ color: 'var(--brand-muted)' }} /> {lead.phone}</div>
+                    <div style={{ display: 'flex', gap: '8px' }}><Clock size={14} style={{ color: 'var(--brand-muted)' }} /> {new Date(lead.createdAt).toLocaleString('pt-BR')}</div>
+                  </div>
+                </div>
+              ))}
+              {clientLeads.length === 0 && (
+                <div className="panel" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 'var(--space-64)', color: 'var(--brand-muted)' }}>
+                  Nenhum lead armazenado no momento.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
     </div>
   );
 }

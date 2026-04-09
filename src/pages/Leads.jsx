@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import {
   Phone, Mail, MessageCircle, ExternalLink,
-  Filter, Search, UserPlus,
+  Filter, Search, UserPlus, Users
 } from 'lucide-react';
-import { MOCK_LEADS } from '../data/mockData';
+import { MOCK_LEADS, MOCK_CLIENTS } from '../data/mockData';
 
 const STATUS_MAP = {
   new: { label: 'Novo', class: 'good' },
@@ -14,9 +14,11 @@ const STATUS_MAP = {
 export default function Leads() {
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [clientFilter, setClientFilter] = useState('todos');
 
   const filtered = MOCK_LEADS.filter((lead) => {
     if (filter !== 'all' && lead.status !== filter) return false;
+    if (clientFilter !== 'todos' && lead.clientName !== clientFilter) return false;
     if (search && !lead.name.toLowerCase().includes(search.toLowerCase()) &&
         !lead.email.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
@@ -64,6 +66,17 @@ export default function Leads() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <select 
+            className="form-select" 
+            value={clientFilter} 
+            onChange={(e) => setClientFilter(e.target.value)}
+            style={{ maxWidth: '240px', background: 'var(--brand-surface-01)' }}
+          >
+            <option value="todos">Todos os Clientes</option>
+            {MOCK_CLIENTS.map(c => (
+              <option key={c.id} value={c.name}>{c.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 

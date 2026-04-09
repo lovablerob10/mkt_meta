@@ -167,12 +167,12 @@ export const MOCK_CLIENTS = [
 ];
 
 export const MOCK_LEADS = [
-  { id: 'lead_001', name: 'João Silva', email: 'joao@email.com', phone: '5519998761234', source: 'Formulário GT House', campaign: 'GT House - Formulário Imóveis', status: 'new', createdAt: '2026-04-08T14:30:00' },
-  { id: 'lead_002', name: 'Maria Santos', email: 'maria@email.com', phone: '5519998765432', source: 'Formulário GT House', campaign: 'GT House - Formulário Imóveis', status: 'contacted', createdAt: '2026-04-08T10:15:00' },
-  { id: 'lead_003', name: 'Pedro Oliveira', email: 'pedro@email.com', phone: '5519998769876', source: 'WhatsApp Famoso', campaign: 'Famoso - WhatsApp Leads', status: 'converted', createdAt: '2026-04-07T16:45:00' },
-  { id: 'lead_004', name: 'Ana Costa', email: 'ana@email.com', phone: '5519998763210', source: 'Formulário Metropolitano', campaign: 'Metropolitano - WhatsApp Vendas', status: 'new', createdAt: '2026-04-07T09:20:00' },
-  { id: 'lead_005', name: 'Carlos Ferreira', email: 'carlos@email.com', phone: '5519998764567', source: 'WhatsApp Famoso', campaign: 'Famoso - WhatsApp Leads', status: 'contacted', createdAt: '2026-04-06T11:30:00' },
-  { id: 'lead_006', name: 'Juliana Lima', email: 'juliana@email.com', phone: '5519998767890', source: 'Formulário GT House', campaign: 'GT House - Formulário Imóveis', status: 'new', createdAt: '2026-04-06T08:00:00' },
+  { id: 'lead_001', name: 'João Silva', email: 'joao@email.com', phone: '5519998761234', source: 'Formulário GT House', campaign: 'GT House - Formulário Imóveis', clientName: 'M Politano Imóveis', status: 'new', createdAt: '2026-04-08T14:30:00' },
+  { id: 'lead_002', name: 'Maria Santos', email: 'maria@email.com', phone: '5519998765432', source: 'Formulário GT House', campaign: 'GT House - Formulário Imóveis', clientName: 'M Politano Imóveis', status: 'contacted', createdAt: '2026-04-08T10:15:00' },
+  { id: 'lead_003', name: 'Pedro Oliveira', email: 'pedro@email.com', phone: '5519998769876', source: 'WhatsApp Famoso', campaign: 'Famoso - WhatsApp Leads', clientName: 'Famoso Salgadinhos', status: 'converted', createdAt: '2026-04-07T16:45:00' },
+  { id: 'lead_004', name: 'Ana Costa', email: 'ana@email.com', phone: '5519998763210', source: 'Formulário Metropolitano', campaign: 'Metropolitano - WhatsApp Vendas', clientName: 'M Politano Imóveis', status: 'new', createdAt: '2026-04-07T09:20:00' },
+  { id: 'lead_005', name: 'Carlos Ferreira', email: 'carlos@email.com', phone: '5519998764567', source: 'WhatsApp Famoso', campaign: 'Famoso - WhatsApp Leads', clientName: 'Famoso Salgadinhos', status: 'contacted', createdAt: '2026-04-06T11:30:00' },
+  { id: 'lead_006', name: 'Juliana Lima', email: 'juliana@email.com', phone: '5519998767890', source: 'Formulário GT House', campaign: 'GT House - Formulário Imóveis', clientName: 'M Politano Imóveis', status: 'new', createdAt: '2026-04-06T08:00:00' },
 ];
 
 export const MOCK_DEMOGRAPHICS = {
