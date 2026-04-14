@@ -124,12 +124,18 @@ export function AuthProvider({ children }) {
     }
 
     // Verificar sessão existente
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        loadProfile(session.user);
-      }
-      setIsLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (session?.user) {
+          loadProfile(session.user);
+        }
+      })
+      .catch((err) => {
+        console.warn('[ZMKT] Erro ao verificar sessão:', err);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
 
     // Listener de mudanças de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
