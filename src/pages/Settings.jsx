@@ -749,20 +749,98 @@ function ClientsTab() {
 }
 
 // ════════════════════════════════════════════════════════
-// TAB 3: INTEGRATIONS (preserva conteúdo original)
+// TAB 3: INTEGRATIONS (Real Facebook SDK Flow)
 // ════════════════════════════════════════════════════════
 function IntegrationsTab() {
+  const { user } = useAuth();
   const [connecting, setConnecting] = useState(false);
+  const [loadingBMs, setLoadingBMs] = useState(true);
+  const [bms, setBms] = useState([]);
+  const [personalAccounts, setPersonalAccounts] = useState([]);
+  const [error, setError] = useState('');
 
-  const MOCK_BMS = [
-    { id: 'bm_001', name: 'Zara MKT Principal', status: 'connected', accounts: 8, pages: 5, igAccounts: 5 },
-    { id: 'bm_002', name: 'Famoso Salgadinhos BM', status: 'connected', accounts: 2, pages: 1, igAccounts: 1 },
-    { id: 'bm_003', name: 'Metropolitano BM', status: 'pending', accounts: 3, pages: 2, igAccounts: 2 },
-  ];
+  const loadMetaIntegations = useCallback(async () => {
+    setLoadingBMs(true);
+    try {
+      const { data: { session } } = await import('../lib/supabase').then(m => m.supabase.auth.getSession());
+      if (!session) return;
+      
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-graph`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ action: 'get_bms' })
+      });
+      
+      const data = await res.json();
+      
+      if (data.notConfigured) {
+         setBms([]);
+         setPersonalAccounts([]);
+      } else if (data.success) {
+         setBms(data.businesses || []);
+         setPersonalAccounts(data.personalAdAccounts || []);
+      } else {
+         throw new Error(data.error || 'Erro ao carregar Integrações');
+      }
+    } catch (err) {
+      console.error("[ZMKT] Erro carregando BMs:", err);
+      // Ignora erro silenciomamente caso não configurado, só não mostra
+    } finally {
+      setLoadingBMs(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMetaIntegations();
+  }, [loadMetaIntegations]);
 
   const handleConnect = () => {
+    if (!window.FB) {
+       setError("Facebook SDK não carregou. Reinicie a página.");
+       return;
+    }
     setConnecting(true);
-    setTimeout(() => setConnecting(false), 2000);
+    setError('');
+
+    window.FB.login(async (response) => {
+      if (response.authResponse) {
+        // Usuário logou e deu permissão
+        const shortLivedToken = response.authResponse.accessToken;
+        
+        try {
+          const { data: { session } } = await import('../lib/supabase').then(m => m.supabase.auth.getSession());
+          
+          const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-auth`, {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+               'Authorization': `Bearer ${session.access_token}`
+             },
+             body: JSON.stringify({ shortLivedToken })
+          });
+
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.error || "Erro ao conectar conta");
+          
+          // Re-carregar as BMs
+          await loadMetaIntegations();
+          
+        } catch(err) {
+          setError(err.message);
+        } finally {
+          setConnecting(false);
+        }
+      } else {
+        setError("Usuário cancelou o login ou não autorizou.");
+        setConnecting(false);
+      }
+    }, { 
+      // Escopos necessários para acessar BM e Campanhas
+      scope: 'ads_management,ads_read,business_management,pages_show_list,pages_read_engagement' 
+    });
   };
 
   return (
@@ -775,6 +853,17 @@ function IntegrationsTab() {
             <div className="panel-title">Conexão com Facebook</div>
           </div>
         </div>
+        
+        {error && (
+          <div style={{
+            padding: 'var(--space-12)', background: 'rgba(239,68,68,0.1)',
+            border: '1px solid rgba(239,68,68,0.2)', borderRadius: 'var(--radius-md)',
+            color: '#fca5a5', fontSize: 'var(--font-body-sm)', marginBottom: 'var(--space-16)',
+          }}>
+            {error}
+          </div>
+        )}
+
         <p style={{ color: 'var(--brand-muted)', marginBottom: 'var(--space-24)', maxWidth: 600 }}>
           Conecte o perfil do Facebook da agência para acessar todas as BMs,
           contas de anúncio, páginas e perfis do Instagram.
@@ -782,7 +871,7 @@ function IntegrationsTab() {
         <button className="btn btn-primary" onClick={handleConnect} disabled={connecting}
           style={{ gap: 'var(--space-12)' }}>
           <Share2 size={18} />
-          {connecting ? 'Conectando...' : 'Conectar com Facebook'}
+          {connecting ? 'Conectando/Autorizando...' : 'Conectar com Facebook'}
         </button>
         <div style={{
           marginTop: 'var(--space-24)', padding: 'var(--space-16)',
@@ -792,9 +881,9 @@ function IntegrationsTab() {
         }}>
           <strong style={{ color: 'var(--brand-accent-light)' }}>Como funciona:</strong><br />
           1. Clique em "Conectar com Facebook"<br />
-          2. Faça login com a conta da agência<br />
+          2. Faça login com a conta da agência no popup seguro<br />
           3. Autorize o acesso às BMs e contas de anúncio<br />
-          4. Todas as contas serão importadas automaticamente
+          4. Todas as contas serão conectadas com Token Permanente e Seguro
         </div>
       </div>
 
@@ -803,54 +892,74 @@ function IntegrationsTab() {
         <div className="panel-header">
           <div>
             <div className="panel-subtitle">Business Managers</div>
-            <div className="panel-title">BMs Conectadas</div>
+            <div className="panel-title">BMs Conectadas do Meta</div>
           </div>
-          <button className="btn btn-ghost btn-sm">
-            <RefreshCw size={14} /> Sincronizar
+          <button className="btn btn-ghost btn-sm" onClick={loadMetaIntegations}>
+            <RefreshCw size={14} /> Sincronizar Base
           </button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-12)' }}>
-          {MOCK_BMS.map((bm) => (
-            <div key={bm.id} style={{
-              background: 'var(--brand-surface-02)', borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-16) var(--space-24)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              flexWrap: 'wrap', gap: 'var(--space-16)', border: 'var(--border-subtle)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)' }}>
-                <div style={{
-                  width: 40, height: 40, borderRadius: 'var(--radius-md)',
-                  background: bm.status === 'connected' ? 'var(--color-success-10)' : 'var(--color-warning-10)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {bm.status === 'connected'
-                    ? <Check size={20} style={{ color: 'var(--color-success)' }} />
-                    : <AlertTriangle size={20} style={{ color: 'var(--color-warning)' }} />}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, color: 'var(--brand-offwhite)' }}>{bm.name}</div>
-                  <div style={{ fontSize: 'var(--font-caption)', color: 'var(--brand-muted)' }}>
-                    {bm.status === 'connected' ? 'Conectada' : 'Aguardando autorização'}
+        
+        {loadingBMs ? (
+          <div style={{ textAlign: 'center', padding: 'var(--space-32)', color: 'var(--brand-muted)' }}>
+            <Loader size={24} style={{ animation: 'spin 1s linear infinite' }} />
+            <p>Sincronizando com a nuvem do Z/MKT...</p>
+          </div>
+        ) : bms.length === 0 && personalAccounts.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 'var(--space-32)', color: 'var(--brand-muted)' }}>
+             <Share2 size={40} style={{ opacity: 0.3, marginBottom: 'var(--space-8)' }} />
+             <p>Nenhuma integração encontrada.<br/>Clique em "Conectar com Facebook" acima para começar.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-12)' }}>
+            {bms.map((bm) => (
+              <div key={bm.id} style={{
+                background: 'var(--brand-surface-02)', borderRadius: 'var(--radius-md)',
+                padding: 'var(--space-16) var(--space-24)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                flexWrap: 'wrap', gap: 'var(--space-16)', border: 'var(--border-subtle)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)' }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 'var(--radius-md)',
+                    background: 'var(--color-success-10)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Briefcase size={20} style={{ color: 'var(--color-success)' }} />
                   </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 'var(--space-16)' }}>
-                {[
-                  { value: bm.accounts, label: 'Contas', icon: null },
-                  { value: bm.pages, label: 'Páginas', icon: <Share2 size={14} style={{ color: '#1877F2' }} /> },
-                  { value: bm.igAccounts, label: 'Instagram', icon: <Camera size={14} style={{ color: '#E4405F' }} /> },
-                ].map(({ value, label, icon }) => (
-                  <div key={label} style={{ textAlign: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem' }}>
-                      {icon} {value}
+                  <div>
+                    <div style={{ fontWeight: 700, color: 'var(--brand-offwhite)' }}>{bm.name}</div>
+                    <div style={{ fontSize: 'var(--font-caption)', color: 'var(--brand-muted)' }}>
+                      BM ID: {bm.id} • {bm.verification_status}
                     </div>
-                    <div style={{ fontSize: 'var(--font-caption)', color: 'var(--brand-muted)' }}>{label}</div>
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+            
+            {personalAccounts.map((acc) => (
+              <div key={acc.id} style={{
+                 background: 'var(--brand-surface-02)', borderRadius: 'var(--radius-md)',
+                 padding: 'var(--space-16) var(--space-24)',
+                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                 flexWrap: 'wrap', gap: 'var(--space-16)', border: 'var(--border-subtle)',
+               }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)' }}>
+                   <div style={{
+                     width: 40, height: 40, borderRadius: 'var(--radius-md)',
+                     background: 'var(--color-warning-10)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                   }}>
+                     <UserPlus size={20} style={{ color: 'var(--color-warning)' }} />
+                   </div>
+                   <div>
+                     <div style={{ fontWeight: 700, color: 'var(--brand-offwhite)' }}>{acc.name} (Conta Pessoal)</div>
+                     <div style={{ fontSize: 'var(--font-caption)', color: 'var(--brand-muted)' }}>
+                       Account ID: {acc.account_id} • Moeda: {acc.currency}
+                     </div>
+                   </div>
+                 </div>
+               </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* App Info */}
