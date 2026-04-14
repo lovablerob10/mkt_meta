@@ -17,15 +17,21 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setSubmitting(true);
-    const result = await login(email, password);
-    setSubmitting(false);
-    if (result.success) {
-      // Para mock: result.user tem a role diretamente
-      // Para Supabase: role é carregada via onAuthStateChange
-      const role = result.user?.role;
-      navigate(role === ROLES.CLIENTE ? '/client' : '/');
-    } else {
-      setError(result.error);
+    try {
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Tempo limite excedido. Tente novamente.')), 15000)
+      );
+      const result = await Promise.race([login(email, password), timeout]);
+      if (result.success) {
+        const role = result.user?.role;
+        navigate(role === ROLES.CLIENTE ? '/client' : '/');
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -271,7 +277,7 @@ export default function Login() {
         </div>
 
         {/* ──────── DEV MODE PANEL ──────── */}
-        <div style={{
+        {import.meta.env.DEV && <div style={{
           marginTop: '24px',
           background: 'rgba(15, 23, 42, 0.4)',
           backdropFilter: 'blur(10px)',
@@ -341,7 +347,7 @@ export default function Login() {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
 
         {/* Footer */}
         <div style={{
