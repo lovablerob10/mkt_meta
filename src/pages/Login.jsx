@@ -17,7 +17,10 @@ export default function Login() {
     setError('');
     const result = await login(email, password);
     if (result.success) {
-      navigate(result.user.role === ROLES.CLIENTE ? '/client' : '/');
+      // Para mock: result.user tem a role diretamente
+      // Para Supabase: role é carregada via onAuthStateChange
+      const role = result.user?.role;
+      navigate(role === ROLES.CLIENTE ? '/client' : '/');
     } else {
       setError(result.error);
     }

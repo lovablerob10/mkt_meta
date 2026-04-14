@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 // ────────────────────────────────────────────────────────
 // RBAC Roles — conforme SPEC.md §3
@@ -10,7 +11,7 @@ export const ROLES = {
 };
 
 // ────────────────────────────────────────────────────────
-// Permissões por role — quais rotas cada nível pode ver
+// Permissões por role
 // ────────────────────────────────────────────────────────
 export const ROLE_PERMISSIONS = {
   [ROLES.MASTER]: {
@@ -34,7 +35,7 @@ export const ROLE_PERMISSIONS = {
 };
 
 // ────────────────────────────────────────────────────────
-// Mock Users — serão substituídos por Supabase Auth
+// Mock Users — fallback quando Supabase não está conectado
 // ────────────────────────────────────────────────────────
 const MOCK_USERS = {
   master: {
@@ -64,6 +65,13 @@ const MOCK_USERS = {
   },
 };
 
+// Detecta se Supabase está configurado
+const SUPABASE_CONFIGURED = !!(
+  import.meta.env.VITE_SUPABASE_URL &&
+  import.meta.env.VITE_SUPABASE_ANON_KEY &&
+  !import.meta.env.VITE_SUPABASE_URL.includes('undefined')
+);
+
 // ────────────────────────────────────────────────────────
 // Context
 // ────────────────────────────────────────────────────────
@@ -71,27 +79,105 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Login mockado (será substituído por supabase.auth.signInWithPassword)
-  const login = useCallback(async (email, password) => {
-    setIsLoading(true);
-    // Simula delay de rede
-    await new Promise((r) => setTimeout(r, 600));
-
-    // Para dev: aceita qualquer senha, identifica por email
-    const found = Object.values(MOCK_USERS).find(
-      (u) => u.email.toLowerCase() === email.toLowerCase()
-    );
-
-    if (found) {
-      setUser(found);
-      setIsLoading(false);
-      return { success: true, user: found };
+  // Carregar perfil do Supabase
+  const loadProfile = useCallback(async (authUser) => {
+    if (!authUser) {
+      setUser(null);
+      return;
     }
 
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+
+      if (error || !profile) {
+        console.warn('[ZMKT] Perfil não encontrado para', authUser.email);
+        setUser(null);
+        return;
+      }
+
+      setUser({
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        role: profile.role,
+        avatar: profile.avatar_url,
+        clientId: profile.client_id,
+        phone: profile.phone,
+      });
+    } catch (err) {
+      console.error('[ZMKT] Erro ao carregar perfil:', err);
+      setUser(null);
+    }
+  }, []);
+
+  // Inicialização: verificar sessão ativa
+  useEffect(() => {
+    if (!SUPABASE_CONFIGURED) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Verificar sessão existente
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        loadProfile(session.user);
+      }
+      setIsLoading(false);
+    });
+
+    // Listener de mudanças de auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          await loadProfile(session.user);
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [loadProfile]);
+
+  // Login real via Supabase
+  const login = useCallback(async (email, password) => {
+    setIsLoading(true);
+
+    if (!SUPABASE_CONFIGURED) {
+      // Fallback: mock login
+      await new Promise((r) => setTimeout(r, 600));
+      const found = Object.values(MOCK_USERS).find(
+        (u) => u.email.toLowerCase() === email.toLowerCase()
+      );
+      if (found) {
+        setUser(found);
+        setIsLoading(false);
+        return { success: true, user: found };
+      }
+      setIsLoading(false);
+      return { success: false, error: 'Credenciais inválidas' };
+    }
+
+    // Login real
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setIsLoading(false);
+      return { success: false, error: error.message };
+    }
+
+    // O perfil será carregado pelo onAuthStateChange
     setIsLoading(false);
-    return { success: false, error: 'Credenciais inválidas' };
+    return { success: true, user: data.user };
   }, []);
 
   // Login rápido para desenvolvimento (Dev Mode)
@@ -103,12 +189,14 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Logout
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    if (SUPABASE_CONFIGURED) {
+      await supabase.auth.signOut();
+    }
     setUser(null);
-    // Futuro: supabase.auth.signOut()
   }, []);
 
-  // Helpers de permissão
+  // Helpers
   const hasRole = useCallback((role) => user?.role === role, [user]);
   const canAccess = useCallback(
     (route) => {
@@ -123,6 +211,7 @@ export function AuthProvider({ children }) {
     user,
     isLoading,
     isAuthenticated: !!user,
+    isSupabaseConnected: SUPABASE_CONFIGURED,
     login,
     loginAs,
     logout,
