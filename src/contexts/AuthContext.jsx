@@ -165,19 +165,48 @@ export function AuthProvider({ children }) {
     }
 
     // Login real
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
+      if (error) {
+        setIsLoading(false);
+        return { success: false, error: error.message };
+      }
+
+      // Carregar perfil ANTES de retornar sucesso (evita race condition)
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profileError || !profile) {
+        console.error('[ZMKT] Perfil não encontrado após login:', profileError);
+        setIsLoading(false);
+        return { success: false, error: 'Perfil não encontrado. Contate o administrador.' };
+      }
+
+      const userProfile = {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        role: profile.role,
+        avatar: profile.avatar_url,
+        clientId: profile.client_id,
+        phone: profile.phone,
+      };
+
+      setUser(userProfile);
       setIsLoading(false);
-      return { success: false, error: error.message };
+      return { success: true, user: userProfile };
+    } catch (err) {
+      console.error('[ZMKT] Erro no login:', err);
+      setIsLoading(false);
+      return { success: false, error: 'Erro ao conectar. Tente novamente.' };
     }
-
-    // O perfil será carregado pelo onAuthStateChange
-    setIsLoading(false);
-    return { success: true, user: data.user };
   }, []);
 
   // Login rápido para desenvolvimento (Dev Mode)

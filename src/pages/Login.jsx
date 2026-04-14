@@ -4,18 +4,21 @@ import { useAuth, ROLES, ROLE_PERMISSIONS } from '../contexts/AuthContext';
 import { LogIn, Eye, EyeOff, Zap, Shield, Users, BarChart3 } from 'lucide-react';
 
 export default function Login() {
-  const { login, loginAs, isLoading } = useAuth();
+  const { login, loginAs } = useAuth();
   const navigate = useNavigate();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSubmitting(true);
     const result = await login(email, password);
+    setSubmitting(false);
     if (result.success) {
       // Para mock: result.user tem a role diretamente
       // Para Supabase: role é carregada via onAuthStateChange
@@ -241,7 +244,7 @@ export default function Login() {
 
             <button
               type="submit"
-              disabled={isLoading || !email}
+              disabled={submitting || !email}
               style={{
                 width: '100%',
                 padding: '14px',
@@ -251,18 +254,18 @@ export default function Login() {
                 color: '#fff',
                 fontSize: '15px',
                 fontWeight: 700,
-                cursor: isLoading ? 'wait' : 'pointer',
+                cursor: submitting ? 'wait' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
                 transition: 'all 0.2s',
-                opacity: (!email || isLoading) ? 0.6 : 1,
+                opacity: (!email || submitting) ? 0.6 : 1,
                 boxShadow: '0 4px 15px rgba(255,122,46,0.3)',
               }}
             >
               <LogIn size={18} />
-              {isLoading ? 'Autenticando...' : 'Entrar'}
+              {submitting ? 'Autenticando...' : 'Entrar'}
             </button>
           </form>
         </div>
