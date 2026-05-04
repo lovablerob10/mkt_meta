@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   DollarSign, Users, Eye, MousePointer,
   MessageCircle, FileText, Zap, TrendingUp,
@@ -30,6 +30,7 @@ export default function DashboardAdmin() {
   const [dataSource, setDataSource] = useState('mock'); // 'meta' | 'db' | 'mock'
   const [creditsOpen, setCreditsOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState('all');
+  const [insightsByAccount, setInsightsByAccount] = useState({}); // { accId: { spend, reach, clicks, impressions, leadsWA, leadsForms } }
   
   let activeBmNames = [];
   try {
@@ -83,6 +84,7 @@ export default function DashboardAdmin() {
           let totalSpend = 0, totalReach = 0, totalClicks = 0, totalImpressions = 0;
           let totalLeadsWA = 0, totalLeadsForms = 0;
           const allCampaigns = [];
+          const perAccountMap = {};
 
           const fetchPromises = data.personalAdAccounts.slice(0, 10).map(async (acc) => {
             try {
@@ -94,29 +96,38 @@ export default function DashboardAdmin() {
               const insData = await insRes.json();
               console.log(`[ZMKT] insights ${acc.name} (${acc.id}):`, insData.success ? 'OK' : 'FAIL', insData.insights?.spend || 0);
               
-              if (insData.success && insData.insights) {
-                const spend = parseFloat(insData.insights.spend || 0);
-                const reach = parseInt(insData.insights.reach || 0);
-                const clicks = parseInt(insData.insights.clicks || 0);
-                const impressions = parseInt(insData.insights.impressions || 0);
-                totalSpend += spend;
-                totalReach += reach;
-                totalClicks += clicks;
-                totalImpressions += impressions;
+              let accSpend = 0, accReach = 0, accClicks = 0, accImpressions = 0, accLeadsWA = 0, accLeadsForms = 0;
 
-                // Contar leads das actions (conversões tipo messaging_conversation_started_7d ou lead)
+              if (insData.success && insData.insights) {
+                accSpend = parseFloat(insData.insights.spend || 0);
+                accReach = parseInt(insData.insights.reach || 0);
+                accClicks = parseInt(insData.insights.clicks || 0);
+                accImpressions = parseInt(insData.insights.impressions || 0);
+                totalSpend += accSpend;
+                totalReach += accReach;
+                totalClicks += accClicks;
+                totalImpressions += accImpressions;
+
+                // Contar leads das actions
                 if (insData.insights.actions) {
                   for (const act of insData.insights.actions) {
                     if (act.action_type === 'onsite_conversion.messaging_conversation_started_7d' || 
                         act.action_type === 'onsite_conversion.messaging_first_reply') {
-                      totalLeadsWA += parseInt(act.value || 0);
+                      const v = parseInt(act.value || 0);
+                      accLeadsWA += v;
+                      totalLeadsWA += v;
                     }
                     if (act.action_type === 'lead' || act.action_type === 'offsite_conversion.fb_pixel_lead') {
-                      totalLeadsForms += parseInt(act.value || 0);
+                      const v = parseInt(act.value || 0);
+                      accLeadsForms += v;
+                      totalLeadsForms += v;
                     }
                   }
                 }
               }
+
+              // Salvar métricas por conta
+              perAccountMap[acc.id] = { spend: accSpend, reach: accReach, clicks: accClicks, impressions: accImpressions, leadsWA: accLeadsWA, leadsForms: accLeadsForms };
 
               // Campanhas
               if (insData.success && insData.campaigns && insData.campaigns.length > 0) {
@@ -125,16 +136,17 @@ export default function DashboardAdmin() {
                     id: camp.id,
                     name: camp.name,
                     account: acc.name,
+                    accountId: acc.id,
                     objective: camp.objective || '',
                     status: camp.status === 'ACTIVE' ? 'good' : 'warning',
                     statusLabel: camp.status === 'ACTIVE' ? 'Ativa' : 'Pausada',
-                    spend: parseFloat(insData.insights?.spend || 0),
-                    clicks: parseInt(insData.insights?.clicks || 0),
-                    cpc: parseFloat(insData.insights?.cpc || 0),
-                    leads: 0,
+                    spend: accSpend,
+                    clicks: accClicks,
+                    cpc: accClicks > 0 ? accSpend / accClicks : 0,
+                    leads: accLeadsWA + accLeadsForms,
                     leadType: camp.objective === 'MESSAGES' ? 'whatsapp' : 'form',
-                    impressions: parseInt(insData.insights?.impressions || 0),
-                    reach: parseInt(insData.insights?.reach || 0),
+                    impressions: accImpressions,
+                    reach: accReach,
                   });
                 }
               }
@@ -144,6 +156,9 @@ export default function DashboardAdmin() {
           });
 
           await Promise.all(fetchPromises);
+
+          // Salvar mapa de insights por conta
+          setInsightsByAccount(perAccountMap);
 
           const avgCPC = totalClicks > 0 ? totalSpend / totalClicks : 0;
           const totalLeads = totalLeadsWA + totalLeadsForms;
@@ -248,6 +263,25 @@ export default function DashboardAdmin() {
     loadData();
   }, [dateRange]);
 
+  // Recalcular métricas exibidas com base na conta selecionada
+  const displayMetrics = useMemo(() => {
+    if (selectedAccount === 'all' || !insightsByAccount || Object.keys(insightsByAccount).length === 0) {
+      return metrics;
+    }
+    const acc = insightsByAccount[selectedAccount];
+    if (!acc) return metrics;
+    const totalLeads = (acc.leadsWA || 0) + (acc.leadsForms || 0);
+    return {
+      totalSpend: acc.spend || 0,
+      totalReach: acc.reach || 0,
+      totalClicks: acc.clicks || 0,
+      totalImpressions: acc.impressions || 0,
+      avgCPC: acc.clicks > 0 ? acc.spend / acc.clicks : 0,
+      totalLeads: { total: totalLeads, whatsapp: acc.leadsWA || 0, form: acc.leadsForms || 0 },
+      totalAccounts: 1,
+    };
+  }, [selectedAccount, metrics, insightsByAccount]);
+
   return (
     <div className="page-content">
       {/* Top Bar */}
@@ -316,59 +350,59 @@ export default function DashboardAdmin() {
       <div className="metrics-grid">
         <MetricCard
           icon={DollarSign}
-          value={fmtCurrency(metrics.totalSpend)}
+          value={fmtCurrency(displayMetrics.totalSpend)}
           label="Investimento total"
-          trend="up"
-          trendValue="+12%"
+          trend={displayMetrics.totalSpend > 0 ? "up" : undefined}
+          trendValue={displayMetrics.totalSpend > 0 ? "" : ""}
         />
         <MetricCard
           icon={Users}
-          value={fmt(metrics.totalLeads.total)}
+          value={fmt(displayMetrics.totalLeads.total)}
           label="Leads gerados"
           highlight
-          trend="up"
-          trendValue="+23%"
+          trend={displayMetrics.totalLeads.total > 0 ? "up" : undefined}
+          trendValue=""
         />
         <MetricCard
           icon={MessageCircle}
-          value={fmt(metrics.totalLeads.whatsapp)}
+          value={fmt(displayMetrics.totalLeads.whatsapp)}
           label="WhatsApp"
           abbr="MSG"
           abbrFull="Mensagens iniciadas"
-          trend="up"
-          trendValue="+18%"
+          trend={displayMetrics.totalLeads.whatsapp > 0 ? "up" : undefined}
+          trendValue=""
         />
         <MetricCard
           icon={FileText}
-          value={fmt(metrics.totalLeads.form)}
+          value={fmt(displayMetrics.totalLeads.form)}
           label="Formulários"
           abbr="FORM"
           abbrFull="Leads por formulário"
         />
         <MetricCard
           icon={Eye}
-          value={fmt(metrics.totalReach)}
+          value={fmt(displayMetrics.totalReach)}
           label="Alcance total"
           abbr="REACH"
           abbrFull="Pessoas únicas alcançadas"
         />
         <MetricCard
           icon={MousePointer}
-          value={fmtCurrency(metrics.avgCPC)}
+          value={fmtCurrency(displayMetrics.avgCPC)}
           label="CPC médio"
           abbr="CPC"
           abbrFull="Custo por Clique"
-          trend="down"
-          trendValue="-8%"
+          trend={displayMetrics.avgCPC > 0 ? "down" : undefined}
+          trendValue=""
         />
         <MetricCard
           icon={Zap}
-          value={fmt(metrics.totalClicks)}
+          value={fmt(displayMetrics.totalClicks)}
           label="Cliques totais"
         />
         <MetricCard
           icon={Activity}
-          value={fmt(metrics.totalImpressions)}
+          value={fmt(displayMetrics.totalImpressions)}
           label="Impressões"
           abbr="IMP"
           abbrFull="Número total de exibições"
@@ -605,8 +639,7 @@ export default function DashboardAdmin() {
               {campaigns
                 .filter(c => {
                    if (selectedAccount === 'all') return true;
-                   const accObj = accounts.find(a => a.id === selectedAccount);
-                   return accObj && c.account === accObj.name;
+                   return c.accountId === selectedAccount || c.account === accounts.find(a => a.id === selectedAccount)?.name;
                 })
                 .map((c) => (
                 <tr key={c.id}>
