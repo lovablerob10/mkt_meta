@@ -46,7 +46,7 @@ export default function DashboardAdmin() {
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) { setLoading(false); return; }
 
       // ── Tentativa 1: Meta API via Edge Function ──
       let metaConnected = false;
@@ -58,50 +58,111 @@ export default function DashboardAdmin() {
           else if (localStorage.getItem('zmkt_active_bm_id')) activeBmIds = [localStorage.getItem('zmkt_active_bm_id')];
         } catch(e) {}
 
+        console.log('[ZMKT] Buscando contas... bmIds=', activeBmIds);
         const res = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
           body: JSON.stringify({ action: 'get_bms', bmIds: activeBmIds })
         });
         const data = await res.json();
+        console.log('[ZMKT] get_bms response:', data.success, 'contas:', data.personalAdAccounts?.length);
 
         if (data.success && data.personalAdAccounts && data.personalAdAccounts.length > 0) {
           metaConnected = true;
           setDataSource('meta');
-          setAccounts(data.personalAdAccounts.map(acc => ({
+          
+          const metaAccounts = data.personalAdAccounts.map(acc => ({
             id: acc.id,
             name: acc.name,
             balance: 0,
             status: acc.account_status === 1 ? 'good' : 'warning'
-          })));
+          }));
+          setAccounts(metaAccounts);
 
-          // Buscar insights para cada conta
-          let totalSpend = 0, totalReach = 0, totalClicks = 0, totalImpressions = 0, avgCPC = 0;
-          for (const acc of data.personalAdAccounts.slice(0, 5)) {
+          // Buscar insights + campanhas para TODAS as contas (em paralelo, max 10)
+          let totalSpend = 0, totalReach = 0, totalClicks = 0, totalImpressions = 0;
+          let totalLeadsWA = 0, totalLeadsForms = 0;
+          const allCampaigns = [];
+
+          const fetchPromises = data.personalAdAccounts.slice(0, 10).map(async (acc) => {
             try {
-              const insRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-graph`, {
+              const insRes = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                 body: JSON.stringify({ action: 'get_insights', adAccountId: acc.id })
               });
               const insData = await insRes.json();
+              console.log(`[ZMKT] insights ${acc.name} (${acc.id}):`, insData.success ? 'OK' : 'FAIL', insData.insights?.spend || 0);
+              
               if (insData.success && insData.insights) {
-                totalSpend += parseFloat(insData.insights.spend || 0);
-                totalReach += parseInt(insData.insights.reach || 0);
-                totalClicks += parseInt(insData.insights.clicks || 0);
-                totalImpressions += parseInt(insData.insights.impressions || 0);
+                const spend = parseFloat(insData.insights.spend || 0);
+                const reach = parseInt(insData.insights.reach || 0);
+                const clicks = parseInt(insData.insights.clicks || 0);
+                const impressions = parseInt(insData.insights.impressions || 0);
+                totalSpend += spend;
+                totalReach += reach;
+                totalClicks += clicks;
+                totalImpressions += impressions;
+
+                // Contar leads das actions (conversões tipo messaging_conversation_started_7d ou lead)
+                if (insData.insights.actions) {
+                  for (const act of insData.insights.actions) {
+                    if (act.action_type === 'onsite_conversion.messaging_conversation_started_7d' || 
+                        act.action_type === 'onsite_conversion.messaging_first_reply') {
+                      totalLeadsWA += parseInt(act.value || 0);
+                    }
+                    if (act.action_type === 'lead' || act.action_type === 'offsite_conversion.fb_pixel_lead') {
+                      totalLeadsForms += parseInt(act.value || 0);
+                    }
+                  }
+                }
               }
-            } catch (e) { /* skip individual account errors */ }
-          }
-          avgCPC = totalClicks > 0 ? totalSpend / totalClicks : 0;
-          setMetrics(prev => ({
-            ...prev,
+
+              // Campanhas
+              if (insData.success && insData.campaigns && insData.campaigns.length > 0) {
+                for (const camp of insData.campaigns) {
+                  allCampaigns.push({
+                    id: camp.id,
+                    name: camp.name,
+                    account: acc.name,
+                    objective: camp.objective || '',
+                    status: camp.status === 'ACTIVE' ? 'good' : 'warning',
+                    statusLabel: camp.status === 'ACTIVE' ? 'Ativa' : 'Pausada',
+                    spend: parseFloat(insData.insights?.spend || 0),
+                    clicks: parseInt(insData.insights?.clicks || 0),
+                    cpc: parseFloat(insData.insights?.cpc || 0),
+                    leads: 0,
+                    leadType: camp.objective === 'MESSAGES' ? 'whatsapp' : 'form',
+                    impressions: parseInt(insData.insights?.impressions || 0),
+                    reach: parseInt(insData.insights?.reach || 0),
+                  });
+                }
+              }
+            } catch (e) {
+              console.error(`[ZMKT] Erro insights conta ${acc.id}:`, e.message);
+            }
+          });
+
+          await Promise.all(fetchPromises);
+
+          const avgCPC = totalClicks > 0 ? totalSpend / totalClicks : 0;
+          const totalLeads = totalLeadsWA + totalLeadsForms;
+
+          setMetrics({
             totalSpend,
             totalReach,
             totalClicks,
             totalImpressions,
             avgCPC,
-          }));
+            totalLeads: { total: totalLeads || 0, whatsapp: totalLeadsWA, form: totalLeadsForms },
+            totalAccounts: metaAccounts.length,
+          });
+
+          if (allCampaigns.length > 0) {
+            setCampaigns(allCampaigns);
+          }
+
+          console.log('[ZMKT] Métricas finais:', { totalSpend, totalReach, totalClicks, totalImpressions, totalLeads, campaigns: allCampaigns.length });
         }
       } catch (e) {
         console.warn('[ZMKT] Edge Function não disponível, tentando banco...', e.message);
@@ -110,7 +171,6 @@ export default function DashboardAdmin() {
       // ── Tentativa 2: Dados do Banco Supabase ──
       if (!metaConnected) {
         try {
-          // Carregar clientes
           const { data: dbClients } = await supabase.from('clients').select('*');
           if (dbClients && dbClients.length > 0) {
             setAccounts(dbClients.map(c => ({
@@ -121,7 +181,6 @@ export default function DashboardAdmin() {
             })));
           }
 
-          // Carregar campanhas do banco
           const { data: dbCampaigns } = await supabase.from('campaigns').select('*');
           if (dbCampaigns && dbCampaigns.length > 0) {
             setDataSource('db');
@@ -142,7 +201,6 @@ export default function DashboardAdmin() {
               customMetrics: c.custom_metrics || {},
             })));
 
-            // Agregar métricas
             const totalSpend = dbCampaigns.reduce((s, c) => s + parseFloat(c.spend || 0), 0);
             const totalReach = dbCampaigns.reduce((s, c) => s + (c.reach || 0), 0);
             const totalClicks = dbCampaigns.reduce((s, c) => s + (c.clicks || 0), 0);
@@ -169,13 +227,15 @@ export default function DashboardAdmin() {
       }
 
       // Carregar contagem de leads do banco
-      const { count: leadCount } = await supabase.from('leads').select('*', { count: 'exact', head: true });
-      if (leadCount != null) {
-        setMetrics(prev => ({
-          ...prev,
-          totalLeads: { ...prev.totalLeads, total: leadCount },
-        }));
-      }
+      try {
+        const { count: leadCount } = await supabase.from('leads').select('*', { count: 'exact', head: true });
+        if (leadCount != null && leadCount > 0) {
+          setMetrics(prev => ({
+            ...prev,
+            totalLeads: { ...prev.totalLeads, total: Math.max(prev.totalLeads.total, leadCount) },
+          }));
+        }
+      } catch(e) {}
 
     } catch (err) {
       console.error('[ZMKT] loadData error:', err);
