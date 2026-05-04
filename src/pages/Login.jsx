@@ -18,7 +18,10 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      const result = await login(email, password);
+      const result = await Promise.race([
+        login(email, password),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Tempo limite da requisição (Supabase não respondeu). Tente limpar os dados de navegação ou aba anônima.')), 10000))
+      ]);
       if (result.success) {
         const role = result.user?.role;
         navigate(role === ROLES.CLIENTE ? '/client' : '/');

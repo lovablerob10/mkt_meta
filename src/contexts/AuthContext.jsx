@@ -183,9 +183,6 @@ export function AuthProvider({ children }) {
 
     // Login real
     try {
-      // Sign out any existing session first to avoid lock conflicts
-      await supabase.auth.signOut().catch(() => {});
-
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,

@@ -42,6 +42,9 @@ Deno.serve(async (req) => {
       throw new Error("Apenas administradores MASTER podem configurar a integração primária do Meta");
     }
 
+    console.log(`[META-AUTH] Iniciando troca de token para usuário: ${user.id}`);
+    console.log(`[META-AUTH] App ID: ${fbAppId}`);
+
     // Pega o token curto do body
     const body = await req.json();
     const { shortLivedToken } = body;
@@ -51,15 +54,17 @@ Deno.serve(async (req) => {
     // 1. Trocar por um ShortLivedToken usando AppSecret -> LongLivedToken
     const url = `https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${fbAppId}&client_secret=${fbAppSecret}&fb_exchange_token=${shortLivedToken}`;
     
+    console.log("[META-AUTH] Chamando Graph API para exchange...");
     const exchangeRes = await fetch(url);
     const exchangeData = await exchangeRes.json();
 
     if (exchangeData.error) {
-       console.error("Meta Exchange Error:", exchangeData.error);
+       console.error("[META-AUTH] Meta Exchange Error:", JSON.stringify(exchangeData.error));
        throw new Error(`Erro no Meta: ${exchangeData.error.message}`);
     }
 
     const longLivedToken = exchangeData.access_token;
+    console.log("[META-AUTH] Token de longa duração obtido com sucesso.");
 
     // 2. Obter ID do usuário do Facebook para associar
     const meRes = await fetch(`https://graph.facebook.com/v19.0/me?access_token=${longLivedToken}`);

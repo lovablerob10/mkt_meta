@@ -11,5 +11,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(
   supabaseUrl || '',
-  supabaseAnonKey || ''
+  supabaseAnonKey || '',
+  {
+    auth: {
+      // Desabilita navigator.locks que causa deadlock no Chrome
+      lock: (name, acquireTimeout, fn) => fn(),
+      // Não tentar detectar token na URL (evita conflito com OAuth FB)
+      detectSessionInUrl: false,
+    }
+  }
 );

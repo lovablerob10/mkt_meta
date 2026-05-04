@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   FileText, Check, Download, Send, RefreshCw, Eye, Calendar, Printer, Smartphone, UploadCloud, Image as ImageIcon
 } from 'lucide-react';
-import { MOCK_CLIENTS, MOCK_CAMPAIGNS } from '../data/mockData';
+import { supabase } from '../lib/supabase';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
@@ -10,19 +10,54 @@ const fmt = (n) => n ? n.toLocaleString('pt-BR') : '0';
 const fmtCurrency = (n) => n ? `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00';
 
 export default function Reports() {
-  const [selectedClient, setSelectedClient] = useState(MOCK_CLIENTS[0].id);
+  const [clients, setClients] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
+  const [selectedClient, setSelectedClient] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('03-2026');
   const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
   const [isGenerating, setIsGenerating] = useState(false);
-  const [previewReady, setPreviewReady] = useState(true); // Default has preview
+  const [previewReady, setPreviewReady] = useState(false); // Default to false until data loads
+  const [insightText, setInsightText] = useState('As campanhas apresentaram uma estabilidade excelente durante o mês. Recomendamos uma nova injeção de criativos para o próximo ciclo baseando-se no comportamento atual do público de Alta Intenção.');
   
   const [agencyLogoBase64, setAgencyLogoBase64] = useState(null);
   const [clientLogoBase64, setClientLogoBase64] = useState(null);
 
   const pdfRef = useRef(null);
 
-  const client = MOCK_CLIENTS.find(c => c.id === selectedClient) || MOCK_CLIENTS[0];
-  const activeCampaign = MOCK_CAMPAIGNS.find(c => c.account === client.name);
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const { data: dbClients } = await supabase.from('clients').select('*');
+        const { data: dbCampaigns } = await supabase.from('campaigns').select('*');
+        
+        if (dbClients) {
+          setClients(dbClients);
+          if (dbClients.length > 0) setSelectedClient(dbClients[0].id);
+        }
+        if (dbCampaigns) setCampaigns(dbCampaigns);
+      } catch (err) {
+        console.error('Erro ao carregar dados:', err);
+      } finally {
+        setPreviewReady(true);
+      }
+    }
+    loadData();
+  }, []);
+
+  const client = clients.find(c => c.id === selectedClient) || { name: 'Selecione um Cliente' };
+  
+  // Aggregate campaigns for the selected client
+  const clientCampaigns = campaigns.filter(c => c.client_id === selectedClient);
+  
+  const activeCampaign = clientCampaigns.length > 0 ? {
+    reach: clientCampaigns.reduce((acc, curr) => acc + (curr.reach || 0), 0),
+    impressions: clientCampaigns.reduce((acc, curr) => acc + (curr.impressions || 0), 0),
+    clicks: clientCampaigns.reduce((acc, curr) => acc + (curr.clicks || 0), 0),
+    cpc: clientCampaigns.reduce((acc, curr) => acc + (curr.cpc || 0), 0) / clientCampaigns.length || 0,
+    leads: clientCampaigns.reduce((acc, curr) => acc + (curr.leads || 0), 0),
+    spend: clientCampaigns.reduce((acc, curr) => acc + (curr.spend || 0), 0),
+    customMetrics: clientCampaigns[0]?.custom_metrics || {}
+  } : null;
 
   const handleGenerate = async () => {
     if (!pdfRef.current) return;
@@ -84,7 +119,7 @@ export default function Reports() {
                 onChange={(e) => setSelectedClient(e.target.value)}
                 style={{ width: '100%', background: 'var(--brand-surface-01)' }}
               >
-                {MOCK_CLIENTS.map((c) => (
+                {clients.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
@@ -136,6 +171,17 @@ export default function Reports() {
                   Modo Claro
                 </button>
               </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Insight da Agência (Texto do Rodapé)</label>
+              <textarea 
+                className="form-input" 
+                rows="3"
+                value={insightText}
+                onChange={(e) => setInsightText(e.target.value)}
+                style={{ width: '100%', background: 'var(--brand-surface-01)', resize: 'vertical', padding: '12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}
+              />
             </div>
 
             <button 
@@ -280,7 +326,7 @@ export default function Reports() {
                    <div>
                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#FF7A2E', marginBottom: '2px' }}>INSIGHT DA AGÊNCIA</div>
                      <div style={{ fontSize: '14px', color: theme === 'dark' ? '#d1d5db' : '#4b5563', lineHeight: 1.4 }}>
-                       As campanhas apresentaram uma estabilidade excelente durante o mês de {selectedMonth.split('-')[0]}. Recomendamos uma nova injeção de criativos para o próximo ciclo baseando-se no comportamento atual do público de {activeCampaign?.customMetrics?.audience || 'Alta Intenção'}.
+                       {insightText}
                      </div>
                    </div>
                 </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth, ROLES } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -42,10 +42,19 @@ const ROUTE_TITLES = {
 // AppContent — Layout principal com sidebar e rotas protegidas
 // ────────────────────────────────────────────────────────
 function AppContent() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const path = window.location.pathname;
   const routeInfo = ROUTE_TITLES[path] || ROUTE_TITLES['/'];
+
+  // Aguarda o carregamento da sessão inicial
+  if (isLoading) {
+    return (
+      <div className="app-layout" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+         <div className="loader"></div>
+      </div>
+    );
+  }
 
   // Se não está logado, qualquer rota protegida redireciona para /login
   if (!isAuthenticated) {
@@ -120,6 +129,20 @@ function AppContent() {
 // App — Root com AuthProvider e Router
 // ────────────────────────────────────────────────────────
 export default function App() {
+  // Captura global do token do Facebook para evitar perda em redirecionamentos de Auth
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes('access_token=')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const fbToken = params.get('access_token');
+      if (fbToken) {
+        console.log('[ZMKT] Token FB capturado globalmente e salvo no localStorage');
+        localStorage.setItem('zmkt_pending_fb_token', fbToken);
+        // O Settings.jsx vai processar isso quando montar
+      }
+    }
+  }, []);
+
   return (
     <BrowserRouter>
       <AuthProvider>
@@ -137,7 +160,8 @@ export default function App() {
 
 // Se já está logado e tenta ir no /login, redireciona p/ home
 function LoginGuard() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isLoading } = useAuth();
+  if (isLoading) return null; // Ou um loader
   if (isAuthenticated) {
     return <Navigate to={user?.role === ROLES.CLIENTE ? '/client' : '/'} replace />;
   }

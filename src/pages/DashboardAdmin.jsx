@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import {
   DollarSign, Users, Eye, MousePointer,
   MessageCircle, FileText, Zap, TrendingUp,
-  ArrowUpRight, Activity, Target, RefreshCw
+  ArrowUpRight, Activity, Target, RefreshCw,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import MetricCard from '../components/MetricCard';
 import { DonutChart, BarChart, LineChart } from '../components/Charts';
@@ -27,6 +28,11 @@ export default function DashboardAdmin() {
   const [campaigns, setCampaigns] = useState(MOCK_CAMPAIGNS);
   const [loading, setLoading] = useState(false);
   const [dataSource, setDataSource] = useState('mock'); // 'meta' | 'db' | 'mock'
+  const [creditsOpen, setCreditsOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState('all');
+  const activeBmName = localStorage.getItem('zmkt_active_bm_name');
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://nlgwoetmyqbdqdhgeidh.supabase.co';
 
   const loadData = async () => {
     setLoading(true);
@@ -37,7 +43,7 @@ export default function DashboardAdmin() {
       // ── Tentativa 1: Meta API via Edge Function ──
       let metaConnected = false;
       try {
-        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-graph`, {
+        const res = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
           body: JSON.stringify({ action: 'get_bms' })
@@ -169,7 +175,7 @@ export default function DashboardAdmin() {
 
   return (
     <div className="page-content">
-      {/* Top Warning Strip */}
+      {/* Top Bar */}
       <div className="animate-in" style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -182,25 +188,6 @@ export default function DashboardAdmin() {
         marginBottom: '-1px'
       }}>
         <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--brand-offwhite)' }}>Visão Geral</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            background: 'rgba(250,204,21,0.15)',
-            color: '#FACC15',
-            padding: '4px 12px',
-            borderRadius: '100px',
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            border: '1px solid rgba(250,204,21,0.3)'
-          }}>
-            <span style={{ fontSize: '14px' }}>⚠️</span> 4 contas sem vínculo
-          </div>
-          <button className="btn btn-secondary btn-sm" style={{ padding: '4px 16px' }}>
-            Sair
-          </button>
-        </div>
       </div>
 
       {/* Main Control Bar */}
@@ -219,10 +206,10 @@ export default function DashboardAdmin() {
       }}>
         <div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, margin: '0 0 4px', color: 'var(--brand-offwhite)' }}>
-            Painel da <span style={{ color: 'var(--brand-accent)' }}>Zara MKT</span>
+            Painel da <span style={{ color: 'var(--brand-accent)' }}>{activeBmName || 'Zara MKT'}</span>
           </h2>
           <div style={{ fontSize: 'var(--font-caption)', color: 'var(--brand-muted)' }}>
-            Bem-vindo, Zara MKT • 8 contas • 5 clientes
+            Bem-vindo, {activeBmName || 'Zara MKT'} • {accounts.length} contas
           </div>
         </div>
 
@@ -230,9 +217,14 @@ export default function DashboardAdmin() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
             <Target size={16} color="var(--brand-accent)" />
             <span style={{ fontSize: 'var(--font-caption)', color: 'var(--brand-muted)', fontWeight: 600 }}>Conta:</span>
-            <select className="form-select" style={{ width: 'auto', minWidth: '180px', padding: '6px 32px 6px 12px', background: 'var(--brand-surface-02)' }}>
-              <option>Todas as Contas</option>
-              {accounts.map(a => <option key={a.id}>{a.name}</option>)}
+            <select
+              className="form-select"
+              value={selectedAccount}
+              onChange={(e) => setSelectedAccount(e.target.value)}
+              style={{ width: 'auto', minWidth: '180px', padding: '6px 32px 6px 12px', background: 'var(--brand-surface-02)' }}
+            >
+              <option value="all">Todas as Contas</option>
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
@@ -312,7 +304,19 @@ export default function DashboardAdmin() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 'var(--space-24)', marginBottom: 'var(--space-24)' }}>
         {/* Account balances */}
         <div className="panel animate-in" style={{ marginBottom: 0 }}>
-          <div className="panel-header" style={{ alignItems: 'center', borderBottom: '1px solid rgba(80,90,107,0.3)', paddingBottom: '16px', marginBottom: '24px' }}>
+          <div
+            className="panel-header"
+            onClick={() => setCreditsOpen(prev => !prev)}
+            style={{
+              alignItems: 'center',
+              borderBottom: creditsOpen ? '1px solid rgba(80,90,107,0.3)' : 'none',
+              paddingBottom: creditsOpen ? '16px' : '0',
+              marginBottom: creditsOpen ? '24px' : '0',
+              cursor: 'pointer',
+              userSelect: 'none',
+              transition: 'all 0.2s ease',
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <div className="panel-subtitle" style={{ color: 'var(--brand-muted)', fontWeight: 800 }}>
                 SALDO DAS CONTAS DE ANÚNCIO <span style={{ fontWeight: 500 }}>({accounts.length} CONTAS)</span>
@@ -333,12 +337,23 @@ export default function DashboardAdmin() {
                 <Target size={10} /> 3 sem crédito
               </div>
             </div>
-            <button className="btn btn-ghost btn-sm" style={{ gap: '6px', padding: '4px 12px' }}>
-               <RefreshCw size={12} /> Atualizar 
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button className="btn btn-ghost btn-sm" onClick={(e) => { e.stopPropagation(); }} style={{ gap: '6px', padding: '4px 12px' }}>
+                <RefreshCw size={12} /> Atualizar
+              </button>
+              {creditsOpen ? <ChevronUp size={18} color="var(--brand-muted)" /> : <ChevronDown size={18} color="var(--brand-muted)" />}
+            </div>
           </div>
+          <div style={{
+            maxHeight: creditsOpen ? '2000px' : '0',
+            overflow: 'hidden',
+            transition: 'max-height 0.4s ease, opacity 0.3s ease',
+            opacity: creditsOpen ? 1 : 0,
+          }}>
           <div className="billing-grid">
-            {accounts.map((acc) => (
+            {accounts
+              .filter(acc => selectedAccount === 'all' || acc.id === selectedAccount)
+              .map((acc) => (
               <div key={acc.id} className="billing-card">
                 <div className="billing-card-name">{acc.name}</div>
                 <div className={`billing-card-balance ${
@@ -357,6 +372,7 @@ export default function DashboardAdmin() {
                 </div>
               </div>
             ))}
+          </div>
           </div>
         </div>
 
@@ -511,7 +527,13 @@ export default function DashboardAdmin() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_CAMPAIGNS.map((c) => (
+              {campaigns
+                .filter(c => {
+                   if (selectedAccount === 'all') return true;
+                   const accObj = accounts.find(a => a.id === selectedAccount);
+                   return accObj && c.account === accObj.name;
+                })
+                .map((c) => (
                 <tr key={c.id}>
                   <td>
                     <div className="campaign-name">

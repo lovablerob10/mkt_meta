@@ -5,8 +5,8 @@ import {
   Mail, Phone, Lock, ChevronRight, Copy, Send,
 } from 'lucide-react';
 import { useAuth, ROLES } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import * as adminService from '../lib/adminService';
-import { MOCK_CLIENTS } from '../data/mockData';
 
 // ────────────────────────────────────────────────────────
 // TABS CONFIG
@@ -40,7 +40,9 @@ const AVAILABLE_METRICS = [
 // ────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('users');
+  // Se veio com token do Facebook na URL ou tem um pendente no localStorage, abre direto na aba Integrações
+  const hasOAuthReturn = window.location.hash.includes('access_token=') || window.location.hash.includes('error=') || !!localStorage.getItem('zmkt_pending_fb_token');
+  const [activeTab, setActiveTab] = useState(hasOAuthReturn ? 'integrations' : 'users');
 
   return (
     <div className="page-content">
@@ -758,14 +760,29 @@ function IntegrationsTab() {
   const [bms, setBms] = useState([]);
   const [personalAccounts, setPersonalAccounts] = useState([]);
   const [error, setError] = useState('');
+  const [activeBmId, setActiveBmId] = useState(() => localStorage.getItem('zmkt_active_bm_id') || null);
+
+  const handleSelectBm = (bmId, bmName) => {
+    if (activeBmId === bmId) {
+      // Deselecionar
+      setActiveBmId(null);
+      localStorage.removeItem('zmkt_active_bm_id');
+      localStorage.removeItem('zmkt_active_bm_name');
+    } else {
+      setActiveBmId(bmId);
+      localStorage.setItem('zmkt_active_bm_id', bmId);
+      localStorage.setItem('zmkt_active_bm_name', bmName);
+    }
+  };
 
   const loadMetaIntegations = useCallback(async () => {
     setLoadingBMs(true);
     try {
-      const { data: { session } } = await import('../lib/supabase').then(m => m.supabase.auth.getSession());
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-graph`, {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://nlgwoetmyqbdqdhgeidh.supabase.co';
+      const res = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -793,54 +810,97 @@ function IntegrationsTab() {
     }
   }, []);
 
+  // Processa o token de retorno na URL após o redirecionamento OAuth do FB
   useEffect(() => {
-    loadMetaIntegations();
+    const hash = window.location.hash;
+    
+    // Captura o token da URL e salva no localStorage (backup — App.jsx já faz isso globalmente)
+    if (hash.includes('access_token=')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const fbToken = params.get('access_token');
+      if (fbToken) {
+        localStorage.setItem('zmkt_pending_fb_token', fbToken);
+      }
+      // Limpar URL hash para ficar limpa
+      window.history.replaceState(null, '', window.location.pathname);
+    } else if (hash.includes('error=')) {
+      setError('Login cancelado ou não autorizado pelo Facebook.');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+
+    // Processa token pendente (pode ter vindo do redirect OU de um reload anterior)
+    const processPendingToken = async () => {
+      const pendingToken = localStorage.getItem('zmkt_pending_fb_token');
+      if (!pendingToken) {
+        loadMetaIntegations();
+        return;
+      }
+
+      // IntegrationsTab já está montada — começar processamento
+      setConnecting(true);
+      setError('');
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://nlgwoetmyqbdqdhgeidh.supabase.co';
+      console.log('[ZMKT] Processando token FB pendente...', { supabaseUrl, tokenLength: pendingToken.length });
+
+      // Pegar sessão diretamente — Settings só monta quando o auth já está pronto
+      const { data } = await supabase.auth.getSession();
+      const session = data?.session;
+
+      if (!session) {
+        console.error('[ZMKT] Sem sessão Supabase ativa!');
+        setError('Sessão expirou. Faça login novamente no ZMKT e tente conectar o Facebook.');
+        localStorage.removeItem('zmkt_pending_fb_token');
+        setConnecting(false);
+        return;
+      }
+
+      console.log('[ZMKT] Sessão OK. Enviando token para Edge Function meta-auth...');
+
+      try {
+        const res = await fetch(`${supabaseUrl}/functions/v1/meta-auth`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ shortLivedToken: pendingToken })
+        });
+
+        const result = await res.json();
+        console.log('[ZMKT] Resposta da Edge Function:', { status: res.status, result });
+
+        if (!res.ok) throw new Error(result.error || 'Erro ao conectar conta');
+        
+        // Sucesso! Limpar token pendente e recarregar BMs
+        console.log('[ZMKT] Token salvo com sucesso! Recarregando integrações...');
+        localStorage.removeItem('zmkt_pending_fb_token');
+        await loadMetaIntegations();
+      } catch (err) {
+        console.error('[ZMKT] Erro processando token FB:', err);
+        setError(err.message);
+        localStorage.removeItem('zmkt_pending_fb_token');
+      } finally {
+        setConnecting(false);
+      }
+    };
+
+    processPendingToken();
   }, [loadMetaIntegations]);
 
   const handleConnect = () => {
-    if (!window.FB) {
-       setError("Facebook SDK não carregou. Reinicie a página.");
-       return;
-    }
     setConnecting(true);
     setError('');
 
-    window.FB.login(async (response) => {
-      if (response.authResponse) {
-        // Usuário logou e deu permissão
-        const shortLivedToken = response.authResponse.accessToken;
-        
-        try {
-          const { data: { session } } = await import('../lib/supabase').then(m => m.supabase.auth.getSession());
-          
-          const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-auth`, {
-             method: 'POST',
-             headers: {
-               'Content-Type': 'application/json',
-               'Authorization': `Bearer ${session.access_token}`
-             },
-             body: JSON.stringify({ shortLivedToken })
-          });
-
-          const result = await res.json();
-          if (!res.ok) throw new Error(result.error || "Erro ao conectar conta");
-          
-          // Re-carregar as BMs
-          await loadMetaIntegations();
-          
-        } catch(err) {
-          setError(err.message);
-        } finally {
-          setConnecting(false);
-        }
-      } else {
-        setError("Usuário cancelou o login ou não autorizou.");
-        setConnecting(false);
-      }
-    }, { 
-      // Escopos necessários para acessar BM e Campanhas
-      scope: 'ads_management,ads_read,business_management,pages_show_list,pages_read_engagement' 
-    });
+    // URL direta do OAuth do Facebook — sem popup, sem bloqueio
+    const clientId = import.meta.env.VITE_META_APP_ID || '1271606834480664';
+    const redirectUri = window.location.origin + '/settings';
+    const scopes = 'ads_management,ads_read,business_management,pages_show_list,pages_read_engagement';
+    
+    const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=token`;
+    
+    // Redireciona na mesma aba
+    window.location.href = oauthUrl;
   };
 
   return (
@@ -911,29 +971,56 @@ function IntegrationsTab() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-12)' }}>
-            {bms.map((bm) => (
+            {bms.map((bm) => {
+              const isActive = activeBmId === bm.id;
+              return (
               <div key={bm.id} style={{
-                background: 'var(--brand-surface-02)', borderRadius: 'var(--radius-md)',
+                background: isActive ? 'rgba(34, 197, 94, 0.06)' : 'var(--brand-surface-02)',
+                borderRadius: 'var(--radius-md)',
                 padding: 'var(--space-16) var(--space-24)',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                flexWrap: 'wrap', gap: 'var(--space-16)', border: 'var(--border-subtle)',
+                flexWrap: 'wrap', gap: 'var(--space-16)',
+                border: isActive ? '1px solid rgba(34, 197, 94, 0.4)' : 'var(--border-subtle)',
+                transition: 'all 0.2s ease',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-12)' }}>
                   <div style={{
                     width: 40, height: 40, borderRadius: 'var(--radius-md)',
-                    background: 'var(--color-success-10)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: isActive ? 'rgba(34, 197, 94, 0.15)' : 'var(--color-success-10)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                     <Briefcase size={20} style={{ color: 'var(--color-success)' }} />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 700, color: 'var(--brand-offwhite)' }}>{bm.name}</div>
+                    <div style={{ fontWeight: 700, color: 'var(--brand-offwhite)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {bm.name}
+                      {isActive && (
+                        <span style={{
+                          fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px',
+                          borderRadius: '100px', background: 'rgba(34,197,94,0.15)',
+                          color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)',
+                        }}>✓ ATIVA NO DASHBOARD</span>
+                      )}
+                    </div>
                     <div style={{ fontSize: 'var(--font-caption)', color: 'var(--brand-muted)' }}>
                       BM ID: {bm.id} • {bm.verification_status}
                     </div>
                   </div>
                 </div>
+                <button
+                  className={`btn btn-sm ${isActive ? 'btn-ghost' : 'btn-primary'}`}
+                  onClick={() => handleSelectBm(bm.id, bm.name)}
+                  style={{ fontSize: '0.75rem', padding: '6px 14px', gap: '6px' }}
+                >
+                  {isActive ? (
+                    <><X size={12} /> Desativar</>
+                  ) : (
+                    <><Check size={12} /> Usar no Dashboard</>
+                  )}
+                </button>
               </div>
-            ))}
+              );
+            })}
             
             {personalAccounts.map((acc) => (
               <div key={acc.id} style={{
