@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   FileText, Check, Download, Send, RefreshCw, Eye, Calendar, Printer, Smartphone, UploadCloud, Image as ImageIcon
 } from 'lucide-react';
 import { MOCK_CLIENTS, MOCK_CAMPAIGNS } from '../data/mockData';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 const fmt = (n) => n ? n.toLocaleString('pt-BR') : '0';
 const fmtCurrency = (n) => n ? `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00';
@@ -17,16 +19,30 @@ export default function Reports() {
   const [agencyLogoBase64, setAgencyLogoBase64] = useState(null);
   const [clientLogoBase64, setClientLogoBase64] = useState(null);
 
+  const pdfRef = useRef(null);
+
   const client = MOCK_CLIENTS.find(c => c.id === selectedClient) || MOCK_CLIENTS[0];
   const activeCampaign = MOCK_CAMPAIGNS.find(c => c.account === client.name);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    if (!pdfRef.current) return;
     setIsGenerating(true);
-    setPreviewReady(false);
-    setTimeout(() => {
+    setPreviewReady(true);
+    try {
+      const canvas = await html2canvas(pdfRef.current, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(`Relatorio_${client.name.replace(/\s+/g, '_')}_${selectedMonth}.pdf`);
+    } catch (err) {
+      console.error("Erro ao gerar PDF:", err);
+    } finally {
       setIsGenerating(false);
-      setPreviewReady(true);
-    }, 1500);
+    }
   };
 
   const handleLogoUpload = (e, setter) => {
@@ -176,7 +192,7 @@ export default function Reports() {
               </div>
             ) : (
               // The Actual PDF Slide Mockup Rendering
-              <div style={{ width: '100%', height: '100%', padding: '32px', display: 'flex', flexDirection: 'column', color: theme === 'dark' ? '#fff' : '#111827' }}>
+              <div ref={pdfRef} style={{ width: '100%', height: '100%', padding: '32px', display: 'flex', flexDirection: 'column', color: theme === 'dark' ? '#fff' : '#111827', background: theme === 'dark' ? '#0d111a' : '#f9fafb' }}>
                 {/* PDF Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'auto' }}>
                    <div>

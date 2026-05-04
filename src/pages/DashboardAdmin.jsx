@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   DollarSign, Users, Eye, MousePointer,
   MessageCircle, FileText, Zap, TrendingUp,
@@ -7,7 +7,7 @@ import {
 import MetricCard from '../components/MetricCard';
 import { DonutChart, BarChart, LineChart } from '../components/Charts';
 import {
-  MOCK_GLOBAL_METRICS as metrics,
+  MOCK_GLOBAL_METRICS,
   MOCK_ACCOUNTS,
   MOCK_CAMPAIGNS,
   MOCK_DEMOGRAPHICS,
@@ -15,12 +15,157 @@ import {
   MOCK_DAILY_PERFORMANCE,
   DATE_PRESETS,
 } from '../data/mockData';
+import { supabase } from '../lib/supabase';
 
 const fmt = (n) => n.toLocaleString('pt-BR');
 const fmtCurrency = (n) => `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
 export default function DashboardAdmin() {
   const [dateRange, setDateRange] = useState('last_30d');
+  const [metrics, setMetrics] = useState(MOCK_GLOBAL_METRICS);
+  const [accounts, setAccounts] = useState(MOCK_ACCOUNTS);
+  const [campaigns, setCampaigns] = useState(MOCK_CAMPAIGNS);
+  const [loading, setLoading] = useState(false);
+  const [dataSource, setDataSource] = useState('mock'); // 'meta' | 'db' | 'mock'
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // ── Tentativa 1: Meta API via Edge Function ──
+      let metaConnected = false;
+      try {
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-graph`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+          body: JSON.stringify({ action: 'get_bms' })
+        });
+        const data = await res.json();
+
+        if (data.success && data.personalAdAccounts && data.personalAdAccounts.length > 0) {
+          metaConnected = true;
+          setDataSource('meta');
+          setAccounts(data.personalAdAccounts.map(acc => ({
+            id: acc.id,
+            name: acc.name,
+            balance: 0,
+            status: acc.account_status === 1 ? 'good' : 'warning'
+          })));
+
+          // Buscar insights para cada conta
+          let totalSpend = 0, totalReach = 0, totalClicks = 0, totalImpressions = 0, avgCPC = 0;
+          for (const acc of data.personalAdAccounts.slice(0, 5)) {
+            try {
+              const insRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-graph`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                body: JSON.stringify({ action: 'get_insights', adAccountId: acc.id })
+              });
+              const insData = await insRes.json();
+              if (insData.success && insData.insights) {
+                totalSpend += parseFloat(insData.insights.spend || 0);
+                totalReach += parseInt(insData.insights.reach || 0);
+                totalClicks += parseInt(insData.insights.clicks || 0);
+                totalImpressions += parseInt(insData.insights.impressions || 0);
+              }
+            } catch (e) { /* skip individual account errors */ }
+          }
+          avgCPC = totalClicks > 0 ? totalSpend / totalClicks : 0;
+          setMetrics(prev => ({
+            ...prev,
+            totalSpend,
+            totalReach,
+            totalClicks,
+            totalImpressions,
+            avgCPC,
+          }));
+        }
+      } catch (e) {
+        console.warn('[ZMKT] Edge Function não disponível, tentando banco...', e.message);
+      }
+
+      // ── Tentativa 2: Dados do Banco Supabase ──
+      if (!metaConnected) {
+        try {
+          // Carregar clientes
+          const { data: dbClients } = await supabase.from('clients').select('*');
+          if (dbClients && dbClients.length > 0) {
+            setAccounts(dbClients.map(c => ({
+              id: c.id,
+              name: c.name,
+              balance: 0,
+              status: 'active'
+            })));
+          }
+
+          // Carregar campanhas do banco
+          const { data: dbCampaigns } = await supabase.from('campaigns').select('*');
+          if (dbCampaigns && dbCampaigns.length > 0) {
+            setDataSource('db');
+            setCampaigns(dbCampaigns.map(c => ({
+              id: c.id,
+              name: c.name,
+              account: dbClients?.find(cl => cl.id === c.client_id)?.name || 'N/A',
+              objective: c.objective,
+              status: c.status === 'active' ? 'good' : 'warning',
+              statusLabel: c.status === 'active' ? 'Ativa' : 'Pausada',
+              spend: parseFloat(c.spend || 0),
+              impressions: c.impressions || 0,
+              reach: c.reach || 0,
+              clicks: c.clicks || 0,
+              cpc: parseFloat(c.cpc || 0),
+              leads: c.leads || 0,
+              leadType: c.lead_type,
+              customMetrics: c.custom_metrics || {},
+            })));
+
+            // Agregar métricas
+            const totalSpend = dbCampaigns.reduce((s, c) => s + parseFloat(c.spend || 0), 0);
+            const totalReach = dbCampaigns.reduce((s, c) => s + (c.reach || 0), 0);
+            const totalClicks = dbCampaigns.reduce((s, c) => s + (c.clicks || 0), 0);
+            const totalImpressions = dbCampaigns.reduce((s, c) => s + (c.impressions || 0), 0);
+            const totalLeads = dbCampaigns.reduce((s, c) => s + (c.leads || 0), 0);
+
+            setMetrics(prev => ({
+              ...prev,
+              totalSpend,
+              totalReach,
+              totalClicks,
+              totalImpressions,
+              avgCPC: totalClicks > 0 ? totalSpend / totalClicks : 0,
+              totalLeads: { total: totalLeads, whatsapp: 0, form: 0 },
+              totalAccounts: dbClients?.length || prev.totalAccounts,
+            }));
+          } else {
+            setDataSource('mock');
+          }
+        } catch (e) {
+          console.warn('[ZMKT] Banco não retornou dados, usando mocks');
+          setDataSource('mock');
+        }
+      }
+
+      // Carregar contagem de leads do banco
+      const { count: leadCount } = await supabase.from('leads').select('*', { count: 'exact', head: true });
+      if (leadCount != null) {
+        setMetrics(prev => ({
+          ...prev,
+          totalLeads: { ...prev.totalLeads, total: leadCount },
+        }));
+      }
+
+    } catch (err) {
+      console.error('[ZMKT] loadData error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [dateRange]);
 
   return (
     <div className="page-content">
@@ -87,7 +232,7 @@ export default function DashboardAdmin() {
             <span style={{ fontSize: 'var(--font-caption)', color: 'var(--brand-muted)', fontWeight: 600 }}>Conta:</span>
             <select className="form-select" style={{ width: 'auto', minWidth: '180px', padding: '6px 32px 6px 12px', background: 'var(--brand-surface-02)' }}>
               <option>Todas as Contas</option>
-              {MOCK_ACCOUNTS.map(a => <option key={a.id}>{a.name}</option>)}
+              {accounts.map(a => <option key={a.id}>{a.name}</option>)}
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
@@ -170,7 +315,7 @@ export default function DashboardAdmin() {
           <div className="panel-header" style={{ alignItems: 'center', borderBottom: '1px solid rgba(80,90,107,0.3)', paddingBottom: '16px', marginBottom: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <div className="panel-subtitle" style={{ color: 'var(--brand-muted)', fontWeight: 800 }}>
-                SALDO DAS CONTAS DE ANÚNCIO <span style={{ fontWeight: 500 }}>({MOCK_ACCOUNTS.length} CONTAS)</span>
+                SALDO DAS CONTAS DE ANÚNCIO <span style={{ fontWeight: 500 }}>({accounts.length} CONTAS)</span>
               </div>
               
               <div style={{
@@ -193,7 +338,7 @@ export default function DashboardAdmin() {
             </button>
           </div>
           <div className="billing-grid">
-            {MOCK_ACCOUNTS.map((acc) => (
+            {accounts.map((acc) => (
               <div key={acc.id} className="billing-card">
                 <div className="billing-card-name">{acc.name}</div>
                 <div className={`billing-card-balance ${

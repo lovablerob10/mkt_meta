@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   DollarSign, Users, Eye, MousePointer,
   TrendingUp, Sparkles, MessageCircle,
@@ -7,7 +7,7 @@ import {
 import MetricCard from '../components/MetricCard';
 import { DonutChart, BarChart, LineChart } from '../components/Charts';
 import {
-  MOCK_GLOBAL_METRICS as metrics,
+  MOCK_GLOBAL_METRICS,
   MOCK_CAMPAIGNS,
   MOCK_CLIENTS,
   MOCK_DEMOGRAPHICS,
@@ -25,10 +25,70 @@ export default function DashboardClient() {
 
   const [selectedClientId, setSelectedClientId] = useState(initialId);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'leads'
+  
+  const [metrics, setMetrics] = useState(MOCK_GLOBAL_METRICS);
+  const [activeCampaign, setActiveCampaign] = useState(MOCK_CAMPAIGNS[0]);
+  const [loading, setLoading] = useState(false);
 
   const client = MOCK_CLIENTS.find(c => c.id === selectedClientId) || MOCK_CLIENTS[0];
-  const activeCampaign = MOCK_CAMPAIGNS.find(c => c.account === client.name);
   const clientLeads = MOCK_LEADS.filter(lead => lead.clientName === client.name);
+
+  // Fallback to mock activeCampaign at first
+  useEffect(() => {
+     setActiveCampaign(MOCK_CAMPAIGNS.find(c => c.account === client.name));
+  }, [client.name]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      // Dinamic import of supabase to avoid top level await issues
+      const { supabase } = await import('../lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-graph`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ action: 'get_bms' })
+      });
+      const data = await res.json();
+      
+      if (data.success && data.personalAdAccounts && data.personalAdAccounts.length > 0) {
+        // Encontrar conta correspondente ao cliente se possível, aqui simplificado
+        const account = data.personalAdAccounts[0]; 
+        if (account) {
+          const insRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/meta-graph`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+            body: JSON.stringify({ action: 'get_insights', adAccountId: account.id })
+          });
+          const insData = await insRes.json();
+          if (insData.success && insData.insights) {
+            setMetrics({
+               ...metrics,
+               totalSpend: parseFloat(insData.insights.spend || 0),
+            });
+            setActiveCampaign({
+               ...activeCampaign,
+               spend: parseFloat(insData.insights.spend || 0),
+               clicks: parseInt(insData.insights.clicks || 0),
+               reach: parseInt(insData.insights.reach || 0),
+               impressions: parseInt(insData.insights.impressions || 0),
+               cpc: parseFloat(insData.insights.cpc || 0)
+            });
+          }
+        }
+      }
+    } catch(err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [client.name]);
 
   return (
     <div className="page-content">

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 // ────────────────────────────────────────────────────────
@@ -80,44 +80,55 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const initDone = useRef(false);
 
-  // Carregar perfil do Supabase
+  // Carregar perfil do Supabase com retry
   const loadProfile = useCallback(async (authUser) => {
     if (!authUser) {
       setUser(null);
-      return;
+      return null;
     }
 
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
+    // Retry up to 3 times (handles eventual consistency / cold starts)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
 
-      if (error || !profile) {
-        console.warn('[ZMKT] Perfil não encontrado para', authUser.email);
-        setUser(null);
-        return;
+        if (!error && profile) {
+          const userProfile = {
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            role: profile.role,
+            avatar: profile.avatar_url,
+            clientId: profile.client_id,
+            phone: profile.phone,
+          };
+          setUser(userProfile);
+          return userProfile;
+        }
+
+        console.warn(`[ZMKT] Perfil não encontrado (tentativa ${attempt + 1}/3):`, error?.message);
+        if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
+      } catch (err) {
+        console.error('[ZMKT] Erro ao carregar perfil:', err);
+        if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
       }
-
-      setUser({
-        id: profile.id,
-        name: profile.name,
-        email: profile.email,
-        role: profile.role,
-        avatar: profile.avatar_url,
-        clientId: profile.client_id,
-        phone: profile.phone,
-      });
-    } catch (err) {
-      console.error('[ZMKT] Erro ao carregar perfil:', err);
-      setUser(null);
     }
+
+    setUser(null);
+    return null;
   }, []);
 
-  // Inicialização: verificar sessão ativa
+  // Inicialização: verificar sessão ativa (roda apenas 1 vez)
   useEffect(() => {
+    if (initDone.current) return;
+    initDone.current = true;
+
     if (!SUPABASE_CONFIGURED) {
       setIsLoading(false);
       return;
@@ -127,7 +138,7 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
         if (session?.user) {
-          loadProfile(session.user);
+          return loadProfile(session.user);
         }
       })
       .catch((err) => {
@@ -172,6 +183,9 @@ export function AuthProvider({ children }) {
 
     // Login real
     try {
+      // Sign out any existing session first to avoid lock conflicts
+      await supabase.auth.signOut().catch(() => {});
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -179,33 +193,19 @@ export function AuthProvider({ children }) {
 
       if (error) {
         setIsLoading(false);
-        return { success: false, error: error.message };
+        let msg = error.message;
+        if (msg === 'Invalid login credentials') msg = 'E-mail ou senha incorretos.';
+        return { success: false, error: msg };
       }
 
-      // Carregar perfil ANTES de retornar sucesso (evita race condition)
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
+      // Carregar perfil com retry
+      const userProfile = await loadProfile(data.user);
 
-      if (profileError || !profile) {
-        console.error('[ZMKT] Perfil não encontrado após login:', profileError);
+      if (!userProfile) {
         setIsLoading(false);
         return { success: false, error: 'Perfil não encontrado. Contate o administrador.' };
       }
 
-      const userProfile = {
-        id: profile.id,
-        name: profile.name,
-        email: profile.email,
-        role: profile.role,
-        avatar: profile.avatar_url,
-        clientId: profile.client_id,
-        phone: profile.phone,
-      };
-
-      setUser(userProfile);
       setIsLoading(false);
       return { success: true, user: userProfile };
     } catch (err) {
@@ -213,7 +213,7 @@ export function AuthProvider({ children }) {
       setIsLoading(false);
       return { success: false, error: 'Erro ao conectar. Tente novamente.' };
     }
-  }, []);
+  }, [loadProfile]);
 
   // Login rápido para desenvolvimento (Dev Mode)
   const loginAs = useCallback((roleKey) => {

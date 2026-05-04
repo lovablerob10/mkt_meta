@@ -91,6 +91,27 @@ Deno.serve(async (req) => {
         });
     }
 
+    // 2. get_insights (Busca campanhas e métricas)
+    if (action === 'get_insights') {
+      if (!adAccountId) throw new Error("adAccountId é obrigatório para get_insights");
+
+      // Buscar campanhas ativas
+      const campRes = await fetch(`https://graph.facebook.com/v19.0/${adAccountId}/campaigns?fields=id,name,status,objective&effective_status=['ACTIVE']&access_token=${token}`, { cache: 'no-store' });
+      const campData = await campRes.json();
+
+      // Buscar insights agregados (investimento, alcance, cliques)
+      const insRes = await fetch(`https://graph.facebook.com/v19.0/${adAccountId}/insights?fields=spend,clicks,cpc,impressions,reach,actions&date_preset=last_30d&access_token=${token}`, { cache: 'no-store' });
+      const insData = await insRes.json();
+
+      return new Response(JSON.stringify({ 
+          success: true, 
+          campaigns: campData.data || [],
+          insights: insData.data?.[0] || { spend: 0, clicks: 0, impressions: 0, reach: 0 }
+      }), {
+          headers: { ...MKT_CORS, "Content-Type": "application/json" },
+      });
+    }
+
     throw new Error("Ação inválida");
 
   } catch (error) {

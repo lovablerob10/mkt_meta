@@ -18,10 +18,7 @@ export default function Login() {
     setError('');
     setSubmitting(true);
     try {
-      const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Tempo limite excedido. Tente novamente.')), 15000)
-      );
-      const result = await Promise.race([login(email, password), timeout]);
+      const result = await login(email, password);
       if (result.success) {
         const role = result.user?.role;
         navigate(role === ROLES.CLIENTE ? '/client' : '/');
@@ -29,7 +26,7 @@ export default function Login() {
         setError(result.error);
       }
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Erro de conexão.');
     } finally {
       setSubmitting(false);
     }
@@ -276,78 +273,6 @@ export default function Login() {
           </form>
         </div>
 
-        {/* ──────── DEV MODE PANEL ──────── */}
-        {import.meta.env.DEV && <div style={{
-          marginTop: '24px',
-          background: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(10px)',
-          border: '1px dashed rgba(255,122,46,0.25)',
-          borderRadius: '16px',
-          padding: '20px',
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '16px',
-          }}>
-            <Zap size={14} style={{ color: '#FF7A2E' }} />
-            <span style={{
-              fontSize: '11px',
-              fontWeight: 700,
-              color: '#FF7A2E',
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
-            }}>
-              Dev Mode — Acesso Rápido
-            </span>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-            {DEV_ROLES.map(({ key, icon: Icon, label, desc, color }) => (
-              <button
-                key={key}
-                onClick={() => handleDevLogin(key)}
-                style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${color}30`,
-                  borderRadius: '12px',
-                  padding: '16px 12px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = `${color}15`;
-                  e.currentTarget.style.borderColor = `${color}60`;
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
-                  e.currentTarget.style.borderColor = `${color}30`;
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }}
-              >
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  background: `${color}20`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <Icon size={18} style={{ color }} />
-                </div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#f1f5f9' }}>{label}</div>
-                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>{desc}</div>
-              </button>
-            ))}
-          </div>
-        </div>}
 
         {/* Footer */}
         <div style={{

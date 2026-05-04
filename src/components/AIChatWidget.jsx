@@ -20,40 +20,54 @@ export default function AIChatWidget() {
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
 
-  const handleSend = (text) => {
+  const handleSend = async (text) => {
     const msg = text || input;
     if (!msg.trim()) return;
 
-    setMessages(prev => [...prev, { role: 'user', text: msg }]);
+    const newMessages = [...messages, { role: 'user', text: msg }];
+    setMessages(newMessages);
     setInput('');
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Dinamic import of supabase
+      const { supabase } = await import('../lib/supabase');
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+         setMessages(prev => [...prev, { role: 'bot', text: 'Você precisa estar logado para falar comigo.' }]);
+         return;
+      }
+
+      // Convert messages to OpenAI format
+      const chatHistory = newMessages.map(m => ({
+          role: m.role === 'bot' ? 'assistant' : 'user',
+          content: m.text
+      }));
+
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zmkt-ai-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ messages: chatHistory })
+      });
+
+      const data = await res.json();
+      
+      if (data.reply) {
+         setMessages(prev => [...prev, { role: 'bot', text: data.reply }]);
+      } else {
+         throw new Error(data.error || 'Erro desconhecido');
+      }
+
+    } catch (err) {
+      console.error(err);
       setMessages(prev => [
         ...prev,
-        {
-          role: 'bot',
-          text: getAIResponse(msg),
-        },
+        { role: 'bot', text: 'Ops! Tive um problema de conexão com a agência. Tente novamente em alguns segundos. 🔌' },
       ]);
-    }, 800);
-  };
-
-  const getAIResponse = (question) => {
-    const q = question.toLowerCase();
-    if (q.includes('cpc') || q.includes('custo por clique')) {
-      return 'Seu CPC médio está em R$ 0,79 — isso é muito bom! Para o mercado de tráfego, um CPC abaixo de R$ 1,50 é considerado excelente. A campanha "Studio Beleza" tem o melhor CPC: R$ 0,21. 🎯';
     }
-    if (q.includes('lead') || q.includes('leads')) {
-      return 'No total, vocês geraram 387 leads este mês! Sendo 368 pelo WhatsApp e 19 por formulário. A campanha "Famoso - WhatsApp Leads" é a que mais converte com 156 leads. 🚀';
-    }
-    if (q.includes('anúncio') || q.includes('campanha') || q.includes('como estão')) {
-      return 'No geral, suas campanhas estão indo bem! 3 de 5 estão com status "Boa". A campanha "Metropolitano - WhatsApp Vendas" precisa de atenção — o CPC está em R$ 2,58, acima da média. Recomendo revisar o público-alvo ou o criativo. 📊';
-    }
-    if (q.includes('semana') || q.includes('resumo')) {
-      return 'Resumo da última semana: R$ 5.005,30 investidos, 387 leads gerados, 6.369 cliques com CPC médio de R$ 0,79. O alcance total foi de 203.100 pessoas. Destaque: campanha de branding do Studio Beleza atingiu 67 mil pessoas com CPC de R$ 0,21! 💰';
-    }
-    return 'Entendi! Vou analisar seus dados para responder melhor. No momento, todas as suas 5 contas estão ativas, com um gasto total de R$ 5.005,30 e 387 oportunidades geradas. Quer saber algo específico sobre alguma campanha? 😊';
   };
 
   return (
