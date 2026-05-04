@@ -83,12 +83,12 @@ Deno.serve(async (req) => {
             for (const bmId of bmIds) {
                 try {
                     // Buscar as contas de anúncio do BM (client_ad_accounts ou owned_ad_accounts)
-                    const bmAccRes = await fetch(`https://graph.facebook.com/v19.0/${bmId}/client_ad_accounts?fields=id,name,account_id,account_status,currency&access_token=${token}`, { cache: 'no-store' });
+                    const bmAccRes = await fetch(`https://graph.facebook.com/v19.0/${bmId}/client_ad_accounts?fields=id,name,account_id,account_status,currency,balance,amount_spent,spend_cap&access_token=${token}`, { cache: 'no-store' });
                     const bmAccData = await bmAccRes.json();
                     if (bmAccData.data && bmAccData.data.length > 0) {
                         adAccounts.push(...bmAccData.data);
                     } else {
-                        const ownAccRes = await fetch(`https://graph.facebook.com/v19.0/${bmId}/owned_ad_accounts?fields=id,name,account_id,account_status,currency&access_token=${token}`, { cache: 'no-store' });
+                        const ownAccRes = await fetch(`https://graph.facebook.com/v19.0/${bmId}/owned_ad_accounts?fields=id,name,account_id,account_status,currency,balance,amount_spent,spend_cap&access_token=${token}`, { cache: 'no-store' });
                         const ownAccData = await ownAccRes.json();
                         if (ownAccData.data && ownAccData.data.length > 0) {
                             adAccounts.push(...ownAccData.data);
@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
             adAccounts = adAccounts.filter((acc, index, self) => index === self.findIndex((a) => a.id === acc.id));
         } else {
             // Puxar as AdAccounts principais do próprio usuário como fallback
-            const addAccRes = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_id,account_status,currency&access_token=${token}`, { cache: 'no-store' });
+            const addAccRes = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_id,account_status,currency,balance,amount_spent,spend_cap&access_token=${token}`, { cache: 'no-store' });
             const addAccData = await addAccRes.json();
             adAccounts = addAccData.data || [];
         }

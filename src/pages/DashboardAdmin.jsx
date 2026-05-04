@@ -75,7 +75,9 @@ export default function DashboardAdmin() {
           const metaAccounts = data.personalAdAccounts.map(acc => ({
             id: acc.id,
             name: acc.name,
-            balance: 0,
+            balance: parseFloat(acc.balance || 0) / 100,
+            amountSpent: parseFloat(acc.amount_spent || 0) / 100,
+            spendCap: parseFloat(acc.spend_cap || 0) / 100,
             status: acc.account_status === 1 ? 'good' : 'warning'
           }));
           setAccounts(metaAccounts);
@@ -443,7 +445,7 @@ export default function DashboardAdmin() {
                 alignItems: 'center',
                 gap: '4px'
               }}>
-                <Target size={10} /> 3 sem crédito
+                <Target size={10} /> {accounts.filter(a => a.balance <= 0).length} sem crédito
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -466,18 +468,18 @@ export default function DashboardAdmin() {
               <div key={acc.id} className="billing-card">
                 <div className="billing-card-name">{acc.name}</div>
                 <div className={`billing-card-balance ${
-                  acc.balance === 0 ? 'empty' :
+                  acc.balance <= 0 ? 'empty' :
                   acc.balance < 100 ? 'low' : 'positive'
                 }`}>
                   {fmtCurrency(acc.balance)}
                 </div>
                 <div className={`status-badge ${
-                  acc.status === 'empty' ? 'bad' :
-                  acc.status === 'low' ? 'warning' : 'good'
+                  acc.balance <= 0 ? 'bad' :
+                  acc.balance < 100 ? 'warning' : 'good'
                 }`}>
                   <span className="status-dot" />
-                  {acc.status === 'empty' ? 'Sem crédito' :
-                   acc.status === 'low' ? 'Crédito baixo' : 'Ativo'}
+                  {acc.balance <= 0 ? 'Sem crédito' :
+                   acc.balance < 100 ? 'Crédito baixo' : 'Ativo'}
                 </div>
               </div>
             ))}
