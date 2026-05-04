@@ -71,21 +71,44 @@ Deno.serve(async (req) => {
     const { action, adAccountId } = body;
 
     // Ações Suportadas
-    // 1. get_bms (Resgata todas os BMs (Businesses) vinculados a este token)
     if (action === 'get_bms') {
+        const bmIds = body.bmIds || [];
+
         // Obter os BMs
         const actRes = await fetch(`https://graph.facebook.com/v19.0/me/businesses?fields=id,name,verification_status&access_token=${token}`, { cache: 'no-store' });
         const actData = await actRes.json();
         
-        // Puxar as AdAccounts principais do próprio usuário como fallback, pois muitas vezes 
-        // a AdAccount é pessoal e não do BM.
-        const addAccRes = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_id,account_status,currency&access_token=${token}`, { cache: 'no-store' });
-        const addAccData = await addAccRes.json();
+        let adAccounts = [];
+        if (bmIds.length > 0) {
+            for (const bmId of bmIds) {
+                try {
+                    // Buscar as contas de anúncio do BM (client_ad_accounts ou owned_ad_accounts)
+                    const bmAccRes = await fetch(`https://graph.facebook.com/v19.0/${bmId}/client_ad_accounts?fields=id,name,account_id,account_status,currency&access_token=${token}`, { cache: 'no-store' });
+                    const bmAccData = await bmAccRes.json();
+                    if (bmAccData.data && bmAccData.data.length > 0) {
+                        adAccounts.push(...bmAccData.data);
+                    } else {
+                        const ownAccRes = await fetch(`https://graph.facebook.com/v19.0/${bmId}/owned_ad_accounts?fields=id,name,account_id,account_status,currency&access_token=${token}`, { cache: 'no-store' });
+                        const ownAccData = await ownAccRes.json();
+                        if (ownAccData.data && ownAccData.data.length > 0) {
+                            adAccounts.push(...ownAccData.data);
+                        }
+                    }
+                } catch (e) {}
+            }
+            // Remove duplicatas caso alguma conta venha mais de uma vez em diferentes BMs
+            adAccounts = adAccounts.filter((acc, index, self) => index === self.findIndex((a) => a.id === acc.id));
+        } else {
+            // Puxar as AdAccounts principais do próprio usuário como fallback
+            const addAccRes = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_id,account_status,currency&access_token=${token}`, { cache: 'no-store' });
+            const addAccData = await addAccRes.json();
+            adAccounts = addAccData.data || [];
+        }
 
         return new Response(JSON.stringify({ 
             success: true, 
             businesses: actData.data || [],
-            personalAdAccounts: addAccData.data || []
+            personalAdAccounts: adAccounts
         }), {
             headers: { ...MKT_CORS, "Content-Type": "application/json" },
         });

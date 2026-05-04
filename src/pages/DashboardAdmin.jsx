@@ -30,7 +30,15 @@ export default function DashboardAdmin() {
   const [dataSource, setDataSource] = useState('mock'); // 'meta' | 'db' | 'mock'
   const [creditsOpen, setCreditsOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState('all');
-  const activeBmName = localStorage.getItem('zmkt_active_bm_name');
+  
+  let activeBmNames = [];
+  try {
+    const stored = localStorage.getItem('zmkt_active_bm_names');
+    if (stored) activeBmNames = JSON.parse(stored);
+    else if (localStorage.getItem('zmkt_active_bm_name')) activeBmNames = [localStorage.getItem('zmkt_active_bm_name')];
+  } catch(e) {}
+  
+  const displayTitle = activeBmNames.length === 0 ? 'Zara MKT' : activeBmNames.length === 1 ? activeBmNames[0] : 'Múltiplas BMs';
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://nlgwoetmyqbdqdhgeidh.supabase.co';
 
@@ -43,10 +51,17 @@ export default function DashboardAdmin() {
       // ── Tentativa 1: Meta API via Edge Function ──
       let metaConnected = false;
       try {
+        let activeBmIds = [];
+        try {
+          const stored = localStorage.getItem('zmkt_active_bm_ids');
+          if (stored) activeBmIds = JSON.parse(stored);
+          else if (localStorage.getItem('zmkt_active_bm_id')) activeBmIds = [localStorage.getItem('zmkt_active_bm_id')];
+        } catch(e) {}
+
         const res = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-          body: JSON.stringify({ action: 'get_bms' })
+          body: JSON.stringify({ action: 'get_bms', bmIds: activeBmIds })
         });
         const data = await res.json();
 
@@ -206,10 +221,10 @@ export default function DashboardAdmin() {
       }}>
         <div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 800, margin: '0 0 4px', color: 'var(--brand-offwhite)' }}>
-            Painel da <span style={{ color: 'var(--brand-accent)' }}>{activeBmName || 'Zara MKT'}</span>
+            Painel da <span style={{ color: 'var(--brand-accent)' }}>{displayTitle}</span>
           </h2>
           <div style={{ fontSize: 'var(--font-caption)', color: 'var(--brand-muted)' }}>
-            Bem-vindo, {activeBmName || 'Zara MKT'} • {accounts.length} contas
+            Bem-vindo, {displayTitle} • {accounts.length} contas
           </div>
         </div>
 

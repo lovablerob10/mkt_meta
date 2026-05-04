@@ -760,19 +760,40 @@ function IntegrationsTab() {
   const [bms, setBms] = useState([]);
   const [personalAccounts, setPersonalAccounts] = useState([]);
   const [error, setError] = useState('');
-  const [activeBmId, setActiveBmId] = useState(() => localStorage.getItem('zmkt_active_bm_id') || null);
+  const [activeBmIds, setActiveBmIds] = useState(() => {
+    try {
+      const stored = localStorage.getItem('zmkt_active_bm_ids');
+      if (stored) return JSON.parse(stored);
+    } catch(e) {}
+    // Fallback migration from single string:
+    const old = localStorage.getItem('zmkt_active_bm_id');
+    if (old) return [old];
+    return [];
+  });
+
+  const [activeBmNames, setActiveBmNames] = useState(() => {
+    try {
+      const stored = localStorage.getItem('zmkt_active_bm_names');
+      if (stored) return JSON.parse(stored);
+    } catch(e) {}
+    const old = localStorage.getItem('zmkt_active_bm_name');
+    if (old) return [old];
+    return [];
+  });
 
   const handleSelectBm = (bmId, bmName) => {
-    if (activeBmId === bmId) {
-      // Deselecionar
-      setActiveBmId(null);
-      localStorage.removeItem('zmkt_active_bm_id');
-      localStorage.removeItem('zmkt_active_bm_name');
+    let newIds, newNames;
+    if (activeBmIds.includes(bmId)) {
+      newIds = activeBmIds.filter(id => id !== bmId);
+      newNames = activeBmNames.filter(n => n !== bmName);
     } else {
-      setActiveBmId(bmId);
-      localStorage.setItem('zmkt_active_bm_id', bmId);
-      localStorage.setItem('zmkt_active_bm_name', bmName);
+      newIds = [...activeBmIds, bmId];
+      newNames = [...activeBmNames, bmName];
     }
+    setActiveBmIds(newIds);
+    setActiveBmNames(newNames);
+    localStorage.setItem('zmkt_active_bm_ids', JSON.stringify(newIds));
+    localStorage.setItem('zmkt_active_bm_names', JSON.stringify(newNames));
   };
 
   const loadMetaIntegations = useCallback(async () => {
@@ -972,7 +993,7 @@ function IntegrationsTab() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-12)' }}>
             {bms.map((bm) => {
-              const isActive = activeBmId === bm.id;
+              const isActive = activeBmIds.includes(bm.id);
               return (
               <div key={bm.id} style={{
                 background: isActive ? 'rgba(34, 197, 94, 0.06)' : 'var(--brand-surface-02)',
