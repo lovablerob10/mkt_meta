@@ -23,6 +23,7 @@ export default function Reports() {
 
   const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingInsight, setIsGeneratingInsight] = useState(false);
   const [previewReady, setPreviewReady] = useState(true);
   const [insightText, setInsightText] = useState('As campanhas apresentaram uma estabilidade excelente durante o mês. Recomendamos uma nova injeção de criativos para o próximo ciclo baseando-se no comportamento atual do público de Alta Intenção.');
   
@@ -126,6 +127,43 @@ export default function Reports() {
     }
     loadInsights();
   }, [selectedAccountId, metaAccounts]);
+
+  const handleGenerateInsightWithIA = async () => {
+    setIsGeneratingInsight(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+      const prompt = `Gere um Resumo Executivo (Insight) profissional e direto para um relatório de performance de tráfego pago (Meta Ads) do cliente "${manualData.clientName}".
+Dados do período (${manualData.period}):
+- Investimento: R$ ${manualData.spend}
+- Leads: ${manualData.leads}
+- Alcance: ${manualData.reach}
+- Impressões: ${manualData.impressions}
+- Cliques: ${manualData.clicks}
+
+Faça um único parágrafo bem redigido de 3 a 4 linhas, com um tom animador, estratégico, premium e voltado para negócios. Destaque algum ponto forte e sugira próximos passos. Não use markdown (* ou #), apenas texto limpo.`;
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/zmkt-ai-chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+      });
+      const data = await res.json();
+      
+      if (data.reply) {
+        setInsightText(data.reply);
+      } else {
+        throw new Error('Falha ao gerar');
+      }
+    } catch (err) {
+      console.error('Erro ao gerar insight IA:', err);
+      alert('Erro ao comunicar com a IA. Tente novamente.');
+    } finally {
+      setIsGeneratingInsight(false);
+    }
+  };
 
   const client = { name: manualData.clientName };
   
@@ -288,10 +326,21 @@ export default function Reports() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Insight da Agência (Texto do Rodapé)</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label className="form-label" style={{ marginBottom: 0 }}>Insight da Agência (Texto do Rodapé)</label>
+                <button 
+                  className="btn btn-secondary btn-sm" 
+                  style={{ fontSize: '11px', padding: '4px 10px', color: '#ff4d4f', border: '1px solid rgba(255,77,79,0.3)', background: 'transparent' }}
+                  onClick={handleGenerateInsightWithIA}
+                  disabled={isGeneratingInsight}
+                >
+                  {isGeneratingInsight ? <RefreshCw size={12} className="spin" style={{ marginRight: 4 }} /> : null}
+                  {isGeneratingInsight ? 'Gerando...' : '✨ Gerar com IA'}
+                </button>
+              </div>
               <textarea 
                 className="form-input" 
-                rows="3"
+                rows="4"
                 value={insightText}
                 onChange={(e) => setInsightText(e.target.value)}
                 style={{ width: '100%', background: 'var(--brand-surface-01)', resize: 'vertical', padding: '12px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }}

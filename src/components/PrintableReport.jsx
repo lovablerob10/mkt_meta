@@ -21,17 +21,17 @@ const PrintableReport = forwardRef(({ client, period, metrics, insightText, agen
       }}
     >
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000', paddingBottom: '20px', marginBottom: '30px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000', paddingBottom: '20px', marginBottom: '30px', color: '#000000' }}>
         <div style={{ width: '150px', height: '50px', display: 'flex', alignItems: 'center' }}>
           {agencyLogo ? (
             <img src={agencyLogo} alt="Agência" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
           ) : (
-            <div style={{ fontSize: '24px', fontWeight: '900', letterSpacing: '-1px' }}>Z/MKT</div>
+            <div style={{ fontSize: '24px', fontWeight: '900', letterSpacing: '-1px', color: '#000000' }}>Z/MKT</div>
           )}
         </div>
         
         <div style={{ textAlign: 'center' }}>
-          <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px' }}>Relatório de Performance</h1>
+          <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: '#000000' }}>Relatório de Performance</h1>
           <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#666' }}>{period}</p>
         </div>
 
@@ -39,7 +39,7 @@ const PrintableReport = forwardRef(({ client, period, metrics, insightText, agen
           {clientLogo ? (
             <img src={clientLogo} alt="Cliente" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} />
           ) : (
-            <div style={{ fontSize: '16px', fontWeight: '600' }}>{client?.name || 'Cliente'}</div>
+            <div style={{ fontSize: '16px', fontWeight: '600', color: '#000000' }}>{client?.name || 'Cliente'}</div>
           )}
         </div>
       </div>
