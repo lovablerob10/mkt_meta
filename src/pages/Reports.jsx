@@ -37,7 +37,7 @@ export default function Reports() {
 
   const pdfRef = useRef(null);
 
-  // 1. Carregar TODAS as contas (de todas as BMs) ao iniciar
+  // 1. Carregar TODAS as contas ao iniciar (mesma lógica do Dashboard)
   useEffect(() => {
     async function loadAccounts() {
       try {
@@ -45,34 +45,37 @@ export default function Reports() {
         if (!session) return;
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
-        // Primeiro: buscar a lista de todas as BMs disponíveis
-        const bmRes = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
+        // Ler BMs ativas do localStorage (mesma lógica que funciona no Dashboard)
+        let activeBmIds = [];
+        try {
+          const stored = localStorage.getItem('zmkt_active_bm_ids');
+          if (stored) activeBmIds = JSON.parse(stored);
+          else if (localStorage.getItem('zmkt_active_bm_id')) activeBmIds = [localStorage.getItem('zmkt_active_bm_id')];
+        } catch(e) {}
+
+        console.log('[ZMKT Reports] Buscando contas... bmIds=', activeBmIds);
+        const res = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-          body: JSON.stringify({ action: 'get_bms', bmIds: [] })
+          body: JSON.stringify({ action: 'get_bms', bmIds: activeBmIds })
         });
-        const bmData = await bmRes.json();
-
-        let allBmIds = [];
-        if (bmData.success && bmData.businesses && bmData.businesses.length > 0) {
-          allBmIds = bmData.businesses.map(b => b.id);
-        }
-
-        // Segundo: se temos BMs, buscar as contas de anúncio de TODAS elas
-        if (allBmIds.length > 0) {
-          const accRes = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
+        const data = await res.json();
+        console.log('[ZMKT Reports] get_bms response:', data.success, 'contas:', data.personalAdAccounts?.length, 'businesses:', data.businesses?.length);
+        
+        if (data.success && data.personalAdAccounts && data.personalAdAccounts.length > 0) {
+          setMetaAccounts(data.personalAdAccounts);
+        } else if (data.success && data.businesses && data.businesses.length > 0) {
+          // Fallback: se não veio contas mas veio businesses, buscar contas de todas as BMs
+          const allBmIds = data.businesses.map(b => b.id);
+          const res2 = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
             body: JSON.stringify({ action: 'get_bms', bmIds: allBmIds })
           });
-          const accData = await accRes.json();
-
-          if (accData.success && accData.personalAdAccounts) {
-            setMetaAccounts(accData.personalAdAccounts);
+          const data2 = await res2.json();
+          if (data2.success && data2.personalAdAccounts) {
+            setMetaAccounts(data2.personalAdAccounts);
           }
-        } else if (bmData.success && bmData.personalAdAccounts) {
-          // Fallback: contas pessoais (sem BMs)
-          setMetaAccounts(bmData.personalAdAccounts);
         }
       } catch (err) {
         console.error('Erro ao carregar contas Meta:', err);
