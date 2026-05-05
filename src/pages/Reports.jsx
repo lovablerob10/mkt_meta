@@ -113,8 +113,10 @@ export default function Reports() {
           // Formatar o nome do período para preencher o input text
           let presetText = 'Últimos 30 Dias';
           if (metaDatePreset === 'last_7d') presetText = 'Últimos 7 Dias';
-          if (metaDatePreset === 'last_60d') presetText = 'Últimos 60 Dias';
+          if (metaDatePreset === 'last_month') presetText = 'Mês Passado';
+          if (metaDatePreset === 'this_month') presetText = 'Este Mês';
           if (metaDatePreset === 'last_90d') presetText = 'Últimos 90 Dias';
+          if (metaDatePreset === 'maximum') presetText = 'Período Máximo';
 
           setManualData(prev => ({
             ...prev,
@@ -265,8 +267,10 @@ Mantenha um tom estratégico, voltado para negócios e executivo. NÃO use forma
                 >
                   <option value="last_7d">Últimos 7 dias</option>
                   <option value="last_30d">Últimos 30 dias</option>
-                  <option value="last_60d">Últimos 60 dias</option>
+                  <option value="last_month">Mês Passado</option>
+                  <option value="this_month">Este Mês</option>
                   <option value="last_90d">Últimos 90 dias</option>
+                  <option value="maximum">Máximo (Todo o período)</option>
                 </select>
               </div>
               <div style={{ fontSize: '11px', color: 'var(--brand-muted)', marginTop: '8px' }}>

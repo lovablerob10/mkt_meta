@@ -80,22 +80,30 @@ Deno.serve(async (req) => {
         
         let adAccounts = [];
         if (bmIds.length > 0) {
-            for (const bmId of bmIds) {
+            const fetchPromises = bmIds.map(async (bmId) => {
+                let localAccs = [];
                 try {
                     // Buscar as contas de anúncio do BM (client_ad_accounts ou owned_ad_accounts)
                     const bmAccRes = await fetch(`https://graph.facebook.com/v19.0/${bmId}/client_ad_accounts?fields=id,name,account_id,account_status,currency,balance,amount_spent,spend_cap&access_token=${token}`, { cache: 'no-store' });
                     const bmAccData = await bmAccRes.json();
                     if (bmAccData.data && bmAccData.data.length > 0) {
-                        adAccounts.push(...bmAccData.data);
+                        localAccs.push(...bmAccData.data);
                     } else {
                         const ownAccRes = await fetch(`https://graph.facebook.com/v19.0/${bmId}/owned_ad_accounts?fields=id,name,account_id,account_status,currency,balance,amount_spent,spend_cap&access_token=${token}`, { cache: 'no-store' });
                         const ownAccData = await ownAccRes.json();
                         if (ownAccData.data && ownAccData.data.length > 0) {
-                            adAccounts.push(...ownAccData.data);
+                            localAccs.push(...ownAccData.data);
                         }
                     }
-                } catch (e) {}
-            }
+                } catch (e) {
+                    console.error('Erro ao buscar BM', bmId, e);
+                }
+                return localAccs;
+            });
+            
+            const results = await Promise.all(fetchPromises);
+            results.forEach(accs => adAccounts.push(...accs));
+            
             // Remove duplicatas caso alguma conta venha mais de uma vez em diferentes BMs
             adAccounts = adAccounts.filter((acc, index, self) => index === self.findIndex((a) => a.id === acc.id));
         } else {
