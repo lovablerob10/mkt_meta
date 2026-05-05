@@ -37,7 +37,7 @@ export default function Reports() {
 
   const pdfRef = useRef(null);
 
-  // 1. Carregar as contas (BMs) ao iniciar
+  // 1. Carregar TODAS as contas (de todas as BMs) ao iniciar
   useEffect(() => {
     async function loadAccounts() {
       try {
@@ -45,28 +45,37 @@ export default function Reports() {
         if (!session) return;
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
-        let activeBmIds = [];
-        try {
-          const stored = localStorage.getItem('zmkt_active_bm_ids');
-          if (stored) activeBmIds = JSON.parse(stored);
-          else if (localStorage.getItem('zmkt_active_bm_id')) activeBmIds = [localStorage.getItem('zmkt_active_bm_id')];
-        } catch(e) {}
-
-        const res = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
+        // Primeiro: buscar a lista de todas as BMs disponíveis
+        const bmRes = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-          body: JSON.stringify({ action: 'get_bms', bmIds: activeBmIds })
+          body: JSON.stringify({ action: 'get_bms', bmIds: [] })
         });
-        const data = await res.json();
-        
-        if (data.success && data.personalAdAccounts) {
-          setMetaAccounts(data.personalAdAccounts);
-          if (data.personalAdAccounts.length > 0) {
-            setSelectedAccountId(data.personalAdAccounts[0].id);
+        const bmData = await bmRes.json();
+
+        let allBmIds = [];
+        if (bmData.success && bmData.businesses && bmData.businesses.length > 0) {
+          allBmIds = bmData.businesses.map(b => b.id);
+        }
+
+        // Segundo: se temos BMs, buscar as contas de anúncio de TODAS elas
+        if (allBmIds.length > 0) {
+          const accRes = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+            body: JSON.stringify({ action: 'get_bms', bmIds: allBmIds })
+          });
+          const accData = await accRes.json();
+
+          if (accData.success && accData.personalAdAccounts) {
+            setMetaAccounts(accData.personalAdAccounts);
           }
+        } else if (bmData.success && bmData.personalAdAccounts) {
+          // Fallback: contas pessoais (sem BMs)
+          setMetaAccounts(bmData.personalAdAccounts);
         }
       } catch (err) {
-        console.error('Erro ao carregar BMs:', err);
+        console.error('Erro ao carregar contas Meta:', err);
       }
     }
     loadAccounts();
