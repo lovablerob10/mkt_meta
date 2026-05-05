@@ -32,6 +32,7 @@ export default function Reports() {
 
   const [metaAccounts, setMetaAccounts] = useState([]);
   const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [metaDatePreset, setMetaDatePreset] = useState('last_30d');
   const [isLoadingMeta, setIsLoadingMeta] = useState(false);
 
   const pdfRef = useRef(null);
@@ -85,7 +86,7 @@ export default function Reports() {
         const res = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-          body: JSON.stringify({ action: 'get_insights', adAccountId: selectedAccountId })
+          body: JSON.stringify({ action: 'get_insights', adAccountId: selectedAccountId, datePreset: metaDatePreset })
         });
         const data = await res.json();
         
@@ -109,9 +110,16 @@ export default function Reports() {
             }
           }
 
+          // Formatar o nome do período para preencher o input text
+          let presetText = 'Últimos 30 Dias';
+          if (metaDatePreset === 'last_7d') presetText = 'Últimos 7 Dias';
+          if (metaDatePreset === 'last_60d') presetText = 'Últimos 60 Dias';
+          if (metaDatePreset === 'last_90d') presetText = 'Últimos 90 Dias';
+
           setManualData(prev => ({
             ...prev,
             clientName: acc ? acc.name : prev.clientName,
+            period: presetText,
             spend: accSpend,
             reach: accReach,
             clicks: accClicks,
@@ -126,7 +134,7 @@ export default function Reports() {
       }
     }
     loadInsights();
-  }, [selectedAccountId, metaAccounts]);
+  }, [selectedAccountId, metaDatePreset, metaAccounts]);
 
   const handleGenerateInsightWithIA = async () => {
     setIsGeneratingInsight(true);
@@ -232,18 +240,34 @@ Faça um único parágrafo bem redigido de 3 a 4 linhas, com um tom animador, es
                 <span>Puxar Dados Automáticos da Meta</span>
                 {isLoadingMeta && <RefreshCw size={14} className="spin" style={{ color: 'var(--brand-accent)' }} />}
               </label>
-              <select 
-                className="form-select" 
-                value={selectedAccountId} 
-                onChange={(e) => setSelectedAccountId(e.target.value)}
-                style={{ width: '100%', background: 'var(--brand-surface-02)', border: '1px solid rgba(255,255,255,0.1)' }}
-              >
-                <option value="">Selecione uma Conta Meta...</option>
-                {metaAccounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>{acc.name} ({acc.id})</option>
-                ))}
-              </select>
-              <div style={{ fontSize: '11px', color: 'var(--brand-muted)', marginTop: '6px' }}>Ao selecionar uma conta, os campos abaixo serão preenchidos automaticamente, mas você ainda pode editá-los!</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-8)' }}>
+                <select 
+                  className="form-select" 
+                  value={selectedAccountId} 
+                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  style={{ width: '100%', background: 'var(--brand-surface-02)', border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  <option value="">Selecione a Conta...</option>
+                  {metaAccounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>{acc.name} ({acc.id})</option>
+                  ))}
+                </select>
+
+                <select 
+                  className="form-select" 
+                  value={metaDatePreset} 
+                  onChange={(e) => setMetaDatePreset(e.target.value)}
+                  style={{ width: '100%', background: 'var(--brand-surface-02)', border: '1px solid rgba(255,255,255,0.1)' }}
+                >
+                  <option value="last_7d">Últimos 7 dias</option>
+                  <option value="last_30d">Últimos 30 dias</option>
+                  <option value="last_60d">Últimos 60 dias</option>
+                  <option value="last_90d">Últimos 90 dias</option>
+                </select>
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--brand-muted)', marginTop: '8px' }}>
+                Os campos abaixo serão preenchidos automaticamente com base no período escolhido, mas você ainda pode personalizá-los livremente!
+              </div>
             </div>
 
             <div className="form-group">

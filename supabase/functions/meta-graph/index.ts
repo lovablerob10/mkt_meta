@@ -122,8 +122,10 @@ Deno.serve(async (req) => {
       const campRes = await fetch(`https://graph.facebook.com/v19.0/${adAccountId}/campaigns?fields=id,name,status,objective&effective_status=['ACTIVE']&access_token=${token}`, { cache: 'no-store' });
       const campData = await campRes.json();
 
+      const datePreset = body.datePreset || 'last_30d';
+
       // Buscar insights agregados (investimento, alcance, cliques)
-      const insRes = await fetch(`https://graph.facebook.com/v19.0/${adAccountId}/insights?fields=spend,clicks,cpc,impressions,reach,actions&date_preset=last_30d&access_token=${token}`, { cache: 'no-store' });
+      const insRes = await fetch(`https://graph.facebook.com/v19.0/${adAccountId}/insights?fields=spend,clicks,cpc,impressions,reach,actions&date_preset=${datePreset}&access_token=${token}`, { cache: 'no-store' });
       const insData = await insRes.json();
 
       return new Response(JSON.stringify({ 
