@@ -151,7 +151,11 @@ Dados do período (${manualData.period}):
 - Impressões: ${manualData.impressions}
 - Cliques: ${manualData.clicks}
 
-Faça um único parágrafo bem redigido de 3 a 4 linhas, com um tom animador, estratégico, premium e voltado para negócios. Destaque algum ponto forte e sugira próximos passos. Não use markdown (* ou #), apenas texto limpo.`;
+Escreva o texto dividido em 3 parágrafos curtos (com uma linha em branco entre eles para o texto ficar "respirável" e fácil de ler):
+1. Abertura animadora e premium com a visão geral do investimento e retorno.
+2. Destaque de um ponto forte e análise do custo (CPC/CPL).
+3. Sugestão estratégica clara para os próximos passos.
+Mantenha um tom estratégico, voltado para negócios e executivo. NÃO use formatação markdown (sem asteriscos * ou hashtags #), apenas texto limpo e quebras de linha normais.`;
 
       const res = await fetch(`${supabaseUrl}/functions/v1/zmkt-ai-chat`, {
         method: 'POST',
