@@ -46,25 +46,25 @@ const PrintableReport = forwardRef(({ client, period, metrics, insightText, agen
 
       {/* Main KPIs */}
       <div style={{ marginBottom: '40px' }}>
-        <h2 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #E5E5E5', paddingBottom: '8px', marginBottom: '20px' }}>Visão Geral de Resultados</h2>
+        <h2 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #E5E5E5', paddingBottom: '8px', marginBottom: '20px', color: '#000000', fontWeight: '800' }}>Visão Geral de Resultados</h2>
         
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
           {/* Card 1 */}
           <div style={{ border: '1px solid #E5E5E5', borderRadius: '8px', padding: '20px', backgroundColor: '#FAFAFA' }}>
             <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: '500' }}>Investimento Total</p>
-            <p style={{ margin: '8px 0 0 0', fontSize: '28px', fontWeight: '800' }}>{fmtCurrency(metrics?.spend)}</p>
+            <p style={{ margin: '8px 0 0 0', fontSize: '28px', fontWeight: '900', color: '#000000' }}>{fmtCurrency(metrics?.spend)}</p>
           </div>
           
           {/* Card 2 */}
           <div style={{ border: '1px solid #000', borderRadius: '8px', padding: '20px', backgroundColor: '#000', color: '#FFF' }}>
             <p style={{ margin: 0, fontSize: '12px', color: '#CCC', fontWeight: '500' }}>Leads Gerados</p>
-            <p style={{ margin: '8px 0 0 0', fontSize: '28px', fontWeight: '800' }}>{fmt(metrics?.leads)}</p>
+            <p style={{ margin: '8px 0 0 0', fontSize: '28px', fontWeight: '900', color: '#FFFFFF' }}>{fmt(metrics?.leads)}</p>
           </div>
 
           {/* Card 3 */}
           <div style={{ border: '1px solid #E5E5E5', borderRadius: '8px', padding: '20px', backgroundColor: '#FAFAFA' }}>
             <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: '500' }}>Custo por Lead (CPL)</p>
-            <p style={{ margin: '8px 0 0 0', fontSize: '28px', fontWeight: '800' }}>
+            <p style={{ margin: '8px 0 0 0', fontSize: '28px', fontWeight: '900', color: '#000000' }}>
               {metrics?.leads > 0 ? fmtCurrency(metrics.spend / metrics.leads) : 'R$ 0,00'}
             </p>
           </div>
@@ -72,28 +72,28 @@ const PrintableReport = forwardRef(({ client, period, metrics, insightText, agen
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginTop: '20px' }}>
           {/* Card 4 */}
-          <div style={{ border: '1px solid #E5E5E5', borderRadius: '8px', padding: '20px' }}>
+          <div style={{ border: '1px solid #E5E5E5', borderRadius: '8px', padding: '20px', backgroundColor: '#FAFAFA' }}>
             <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: '500' }}>Alcance</p>
-            <p style={{ margin: '8px 0 0 0', fontSize: '20px', fontWeight: '700' }}>{fmt(metrics?.reach)}</p>
+            <p style={{ margin: '8px 0 0 0', fontSize: '20px', fontWeight: '800', color: '#000000' }}>{fmt(metrics?.reach)}</p>
           </div>
 
           {/* Card 5 */}
-          <div style={{ border: '1px solid #E5E5E5', borderRadius: '8px', padding: '20px' }}>
+          <div style={{ border: '1px solid #E5E5E5', borderRadius: '8px', padding: '20px', backgroundColor: '#FAFAFA' }}>
             <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: '500' }}>Impressões</p>
-            <p style={{ margin: '8px 0 0 0', fontSize: '20px', fontWeight: '700' }}>{fmt(metrics?.impressions)}</p>
+            <p style={{ margin: '8px 0 0 0', fontSize: '20px', fontWeight: '800', color: '#000000' }}>{fmt(metrics?.impressions)}</p>
           </div>
 
           {/* Card 6 */}
-          <div style={{ border: '1px solid #E5E5E5', borderRadius: '8px', padding: '20px' }}>
+          <div style={{ border: '1px solid #E5E5E5', borderRadius: '8px', padding: '20px', backgroundColor: '#FAFAFA' }}>
             <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: '500' }}>Cliques Totais</p>
-            <p style={{ margin: '8px 0 0 0', fontSize: '20px', fontWeight: '700' }}>{fmt(metrics?.clicks)}</p>
+            <p style={{ margin: '8px 0 0 0', fontSize: '20px', fontWeight: '800', color: '#000000' }}>{fmt(metrics?.clicks)}</p>
           </div>
         </div>
       </div>
 
       {/* Insight Section */}
       <div style={{ flex: 1 }}>
-        <h2 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #E5E5E5', paddingBottom: '8px', marginBottom: '20px' }}>Resumo Executivo & Insights</h2>
+        <h2 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #E5E5E5', paddingBottom: '8px', marginBottom: '20px', color: '#000000', fontWeight: '800' }}>Resumo Executivo & Insights</h2>
         <div style={{ 
           borderLeft: '4px solid #000', 
           padding: '20px 30px', 

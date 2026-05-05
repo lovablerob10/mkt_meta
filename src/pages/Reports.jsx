@@ -11,13 +11,19 @@ const fmt = (n) => n ? n.toLocaleString('pt-BR') : '0';
 const fmtCurrency = (n) => n ? `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00';
 
 export default function Reports() {
-  const [clients, setClients] = useState([]);
-  const [campaigns, setCampaigns] = useState([]);
-  const [selectedClient, setSelectedClient] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState('03-2026');
+  const [manualData, setManualData] = useState({
+    clientName: 'M&C Cortinas',
+    period: 'Últimos 30 Dias',
+    spend: 0,
+    leads: 0,
+    reach: 0,
+    impressions: 0,
+    clicks: 0
+  });
+
   const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
   const [isGenerating, setIsGenerating] = useState(false);
-  const [previewReady, setPreviewReady] = useState(false); // Default to false until data loads
+  const [previewReady, setPreviewReady] = useState(true);
   const [insightText, setInsightText] = useState('As campanhas apresentaram uma estabilidade excelente durante o mês. Recomendamos uma nova injeção de criativos para o próximo ciclo baseando-se no comportamento atual do público de Alta Intenção.');
   
   const [agencyLogoBase64, setAgencyLogoBase64] = useState(null);
@@ -25,40 +31,15 @@ export default function Reports() {
 
   const pdfRef = useRef(null);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const { data: dbClients } = await supabase.from('clients').select('*');
-        const { data: dbCampaigns } = await supabase.from('campaigns').select('*');
-        
-        if (dbClients) {
-          setClients(dbClients);
-          if (dbClients.length > 0) setSelectedClient(dbClients[0].id);
-        }
-        if (dbCampaigns) setCampaigns(dbCampaigns);
-      } catch (err) {
-        console.error('Erro ao carregar dados:', err);
-      } finally {
-        setPreviewReady(true);
-      }
-    }
-    loadData();
-  }, []);
-
-  const client = clients.find(c => c.id === selectedClient) || { name: 'Selecione um Cliente' };
+  const client = { name: manualData.clientName };
   
-  // Aggregate campaigns for the selected client
-  const clientCampaigns = campaigns.filter(c => c.client_id === selectedClient);
-  
-  const activeCampaign = clientCampaigns.length > 0 ? {
-    reach: clientCampaigns.reduce((acc, curr) => acc + (curr.reach || 0), 0),
-    impressions: clientCampaigns.reduce((acc, curr) => acc + (curr.impressions || 0), 0),
-    clicks: clientCampaigns.reduce((acc, curr) => acc + (curr.clicks || 0), 0),
-    cpc: clientCampaigns.reduce((acc, curr) => acc + (curr.cpc || 0), 0) / clientCampaigns.length || 0,
-    leads: clientCampaigns.reduce((acc, curr) => acc + (curr.leads || 0), 0),
-    spend: clientCampaigns.reduce((acc, curr) => acc + (curr.spend || 0), 0),
-    customMetrics: clientCampaigns[0]?.custom_metrics || {}
-  } : null;
+  const activeCampaign = {
+    reach: manualData.reach,
+    impressions: manualData.impressions,
+    clicks: manualData.clicks,
+    leads: manualData.leads,
+    spend: manualData.spend
+  };
 
   const handleGenerate = async () => {
     if (!pdfRef.current) return;
@@ -73,7 +54,7 @@ export default function Reports() {
         format: [794, 1123] // A4 dimensions
       });
       pdf.addImage(imgData, 'PNG', 0, 0, 794, 1123);
-      pdf.save(`Relatorio_${client.name.replace(/\s+/g, '_')}_${selectedMonth}.pdf`);
+      pdf.save(`Relatorio_${client.name.replace(/\s+/g, '_')}.pdf`);
     } catch (err) {
       console.error("Erro ao gerar PDF:", err);
     } finally {
@@ -113,31 +94,48 @@ export default function Reports() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-16)' }}>
             <div className="form-group">
-              <label className="form-label">Cliente</label>
-              <select 
-                className="form-select" 
-                value={selectedClient} 
-                onChange={(e) => setSelectedClient(e.target.value)}
+              <label className="form-label">Cliente (Ex: M&C Cortinas)</label>
+              <input 
+                type="text"
+                className="form-input" 
+                value={manualData.clientName} 
+                onChange={(e) => setManualData({...manualData, clientName: e.target.value})}
                 style={{ width: '100%', background: 'var(--brand-surface-01)' }}
-              >
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Período de Análise</label>
-              <select 
-                className="form-select" 
-                value={selectedMonth} 
-                onChange={(e) => setSelectedMonth(e.target.value)}
+              <label className="form-label">Período Customizado (Ex: Últimos 30 Dias)</label>
+              <input 
+                type="text"
+                className="form-input" 
+                value={manualData.period} 
+                onChange={(e) => setManualData({...manualData, period: e.target.value})}
                 style={{ width: '100%', background: 'var(--brand-surface-01)' }}
-              >
-                <option value="04-2026">Abril 2026 (Parcial)</option>
-                <option value="03-2026">Março 2026</option>
-                <option value="02-2026">Fevereiro 2026</option>
-              </select>
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-8)' }}>
+              <div className="form-group">
+                <label className="form-label">Investimento (R$)</label>
+                <input type="number" className="form-input" value={manualData.spend || ''} onChange={e => setManualData({...manualData, spend: parseFloat(e.target.value) || 0})} style={{ background: 'var(--brand-surface-01)' }} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Leads</label>
+                <input type="number" className="form-input" value={manualData.leads || ''} onChange={e => setManualData({...manualData, leads: parseInt(e.target.value) || 0})} style={{ background: 'var(--brand-surface-01)' }} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Alcance</label>
+                <input type="number" className="form-input" value={manualData.reach || ''} onChange={e => setManualData({...manualData, reach: parseInt(e.target.value) || 0})} style={{ background: 'var(--brand-surface-01)' }} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Impressões</label>
+                <input type="number" className="form-input" value={manualData.impressions || ''} onChange={e => setManualData({...manualData, impressions: parseInt(e.target.value) || 0})} style={{ background: 'var(--brand-surface-01)' }} />
+              </div>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">Cliques Totais</label>
+                <input type="number" className="form-input" value={manualData.clicks || ''} onChange={e => setManualData({...manualData, clicks: parseInt(e.target.value) || 0})} style={{ background: 'var(--brand-surface-01)' }} />
+              </div>
             </div>
 
             <div className="form-group">
@@ -243,7 +241,7 @@ export default function Reports() {
                 <PrintableReport 
                   ref={pdfRef}
                   client={client}
-                  period={selectedMonth === '03-2026' ? 'Março de 2026' : (selectedMonth === '04-2026' ? 'Abril de 2026' : 'Fevereiro 2026')}
+                  period={manualData.period}
                   metrics={activeCampaign}
                   insightText={insightText}
                   agencyLogo={agencyLogoBase64}
