@@ -80,19 +80,28 @@ Deno.serve(async (req) => {
         
         let adAccounts = [];
         if (bmIds.length > 0) {
+            // Criar um mapa de nomes de BMs para associar às contas
+            const bmNameMap = {};
+            if (actData.data) {
+              for (const biz of actData.data) {
+                bmNameMap[biz.id] = biz.name;
+              }
+            }
+
             const fetchPromises = bmIds.map(async (bmId) => {
                 let localAccs = [];
+                const bmName = bmNameMap[bmId] || `BM ${bmId}`;
                 try {
                     // Buscar as contas de anúncio do BM (client_ad_accounts ou owned_ad_accounts)
                     const bmAccRes = await fetch(`https://graph.facebook.com/v19.0/${bmId}/client_ad_accounts?fields=id,name,account_id,account_status,currency,balance,amount_spent,spend_cap&access_token=${token}`, { cache: 'no-store' });
                     const bmAccData = await bmAccRes.json();
                     if (bmAccData.data && bmAccData.data.length > 0) {
-                        localAccs.push(...bmAccData.data);
+                        localAccs.push(...bmAccData.data.map(a => ({ ...a, bm_id: bmId, bm_name: bmName })));
                     } else {
                         const ownAccRes = await fetch(`https://graph.facebook.com/v19.0/${bmId}/owned_ad_accounts?fields=id,name,account_id,account_status,currency,balance,amount_spent,spend_cap&access_token=${token}`, { cache: 'no-store' });
                         const ownAccData = await ownAccRes.json();
                         if (ownAccData.data && ownAccData.data.length > 0) {
-                            localAccs.push(...ownAccData.data);
+                            localAccs.push(...ownAccData.data.map(a => ({ ...a, bm_id: bmId, bm_name: bmName })));
                         }
                     }
                 } catch (e) {
@@ -110,7 +119,7 @@ Deno.serve(async (req) => {
             // Puxar as AdAccounts principais do próprio usuário como fallback
             const addAccRes = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?fields=id,name,account_id,account_status,currency,balance,amount_spent,spend_cap&access_token=${token}`, { cache: 'no-store' });
             const addAccData = await addAccRes.json();
-            adAccounts = addAccData.data || [];
+            adAccounts = (addAccData.data || []).map(a => ({ ...a, bm_id: null, bm_name: 'Conta Pessoal' }));
         }
 
         return new Response(JSON.stringify({ 

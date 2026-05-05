@@ -75,6 +75,7 @@ export default function DashboardAdmin() {
           const metaAccounts = data.personalAdAccounts.map(acc => ({
             id: acc.id,
             name: acc.name,
+            bmName: acc.bm_name || 'Conta Pessoal',
             balance: parseFloat(acc.balance || 0) / 100,
             amountSpent: parseFloat(acc.amount_spent || 0) / 100,
             spendCap: parseFloat(acc.spend_cap || 0) / 100,
@@ -335,7 +336,18 @@ export default function DashboardAdmin() {
               style={{ width: 'auto', minWidth: '180px', padding: '6px 32px 6px 12px', background: 'var(--brand-surface-02)' }}
             >
               <option value="all">Todas as Contas</option>
-              {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              {Object.entries(
+                accounts.reduce((groups, a) => {
+                  const bm = a.bmName || 'Conta Pessoal';
+                  if (!groups[bm]) groups[bm] = [];
+                  groups[bm].push(a);
+                  return groups;
+                }, {})
+              ).map(([bmName, accs]) => (
+                <optgroup key={bmName} label={`📁 ${bmName}`}>
+                  {accs.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </optgroup>
+              ))}
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>

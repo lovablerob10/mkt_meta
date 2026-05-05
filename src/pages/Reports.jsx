@@ -266,8 +266,19 @@ Mantenha um tom estratégico, voltado para negócios e executivo. NÃO use forma
                   style={{ width: '100%', background: 'var(--brand-surface-02)', border: '1px solid rgba(255,255,255,0.1)' }}
                 >
                   <option value="">Selecione a Conta...</option>
-                  {metaAccounts.map((acc) => (
-                    <option key={acc.id} value={acc.id}>{acc.name} ({acc.id})</option>
+                  {Object.entries(
+                    metaAccounts.reduce((groups, acc) => {
+                      const bm = acc.bm_name || 'Conta Pessoal';
+                      if (!groups[bm]) groups[bm] = [];
+                      groups[bm].push(acc);
+                      return groups;
+                    }, {})
+                  ).map(([bmName, accs]) => (
+                    <optgroup key={bmName} label={`📁 ${bmName}`}>
+                      {accs.map((acc) => (
+                        <option key={acc.id} value={acc.id}>{acc.name}</option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
 
