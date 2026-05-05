@@ -29,7 +29,103 @@ export default function Reports() {
   const [agencyLogoBase64, setAgencyLogoBase64] = useState(null);
   const [clientLogoBase64, setClientLogoBase64] = useState(null);
 
+  const [metaAccounts, setMetaAccounts] = useState([]);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [isLoadingMeta, setIsLoadingMeta] = useState(false);
+
   const pdfRef = useRef(null);
+
+  // 1. Carregar as contas (BMs) ao iniciar
+  useEffect(() => {
+    async function loadAccounts() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+        let activeBmIds = [];
+        try {
+          const stored = localStorage.getItem('zmkt_active_bm_ids');
+          if (stored) activeBmIds = JSON.parse(stored);
+          else if (localStorage.getItem('zmkt_active_bm_id')) activeBmIds = [localStorage.getItem('zmkt_active_bm_id')];
+        } catch(e) {}
+
+        const res = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+          body: JSON.stringify({ action: 'get_bms', bmIds: activeBmIds })
+        });
+        const data = await res.json();
+        
+        if (data.success && data.personalAdAccounts) {
+          setMetaAccounts(data.personalAdAccounts);
+          if (data.personalAdAccounts.length > 0) {
+            setSelectedAccountId(data.personalAdAccounts[0].id);
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao carregar BMs:', err);
+      }
+    }
+    loadAccounts();
+  }, []);
+
+  // 2. Quando a conta mudar, puxar os insights e atualizar o manualData
+  useEffect(() => {
+    if (!selectedAccountId) return;
+
+    async function loadInsights() {
+      setIsLoadingMeta(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+        const res = await fetch(`${supabaseUrl}/functions/v1/meta-graph`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+          body: JSON.stringify({ action: 'get_insights', adAccountId: selectedAccountId })
+        });
+        const data = await res.json();
+        
+        if (data.success && data.insights) {
+          const acc = metaAccounts.find(a => a.id === selectedAccountId);
+          
+          let accSpend = parseFloat(data.insights.spend || 0);
+          let accReach = parseInt(data.insights.reach || 0);
+          let accClicks = parseInt(data.insights.clicks || 0);
+          let accImpressions = parseInt(data.insights.impressions || 0);
+          let totalLeads = 0;
+
+          if (data.insights.actions) {
+            for (const act of data.insights.actions) {
+              if (act.action_type === 'onsite_conversion.messaging_conversation_started_7d' || 
+                  act.action_type === 'onsite_conversion.messaging_first_reply' ||
+                  act.action_type === 'lead' || 
+                  act.action_type === 'offsite_conversion.fb_pixel_lead') {
+                totalLeads += parseInt(act.value || 0);
+              }
+            }
+          }
+
+          setManualData(prev => ({
+            ...prev,
+            clientName: acc ? acc.name : prev.clientName,
+            spend: accSpend,
+            reach: accReach,
+            clicks: accClicks,
+            impressions: accImpressions,
+            leads: totalLeads
+          }));
+        }
+      } catch (err) {
+        console.error('Erro ao carregar insights:', err);
+      } finally {
+        setIsLoadingMeta(false);
+      }
+    }
+    loadInsights();
+  }, [selectedAccountId, metaAccounts]);
 
   const client = { name: manualData.clientName };
   
@@ -93,6 +189,25 @@ export default function Reports() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-16)' }}>
+            <div className="form-group" style={{ background: 'var(--brand-surface-01)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Puxar Dados Automáticos da Meta</span>
+                {isLoadingMeta && <RefreshCw size={14} className="spin" style={{ color: 'var(--brand-accent)' }} />}
+              </label>
+              <select 
+                className="form-select" 
+                value={selectedAccountId} 
+                onChange={(e) => setSelectedAccountId(e.target.value)}
+                style={{ width: '100%', background: 'var(--brand-surface-02)', border: '1px solid rgba(255,255,255,0.1)' }}
+              >
+                <option value="">Selecione uma Conta Meta...</option>
+                {metaAccounts.map((acc) => (
+                  <option key={acc.id} value={acc.id}>{acc.name} ({acc.id})</option>
+                ))}
+              </select>
+              <div style={{ fontSize: '11px', color: 'var(--brand-muted)', marginTop: '6px' }}>Ao selecionar uma conta, os campos abaixo serão preenchidos automaticamente, mas você ainda pode editá-los!</div>
+            </div>
+
             <div className="form-group">
               <label className="form-label">Cliente (Ex: M&C Cortinas)</label>
               <input 
