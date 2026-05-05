@@ -145,9 +145,48 @@ Deno.serve(async (req) => {
       const insRes = await fetch(`https://graph.facebook.com/v19.0/${adAccountId}/insights?fields=spend,clicks,cpc,impressions,reach,actions&date_preset=${datePreset}&access_token=${token}`, { cache: 'no-store' });
       const insData = await insRes.json();
 
+      // Buscar insights POR CAMPANHA (para detalhamento no relatório)
+      const activeCampaigns = campData.data || [];
+      const campaignInsightsPromises = activeCampaigns.slice(0, 15).map(async (camp) => {
+        try {
+          const cInsRes = await fetch(`https://graph.facebook.com/v19.0/${camp.id}/insights?fields=spend,clicks,impressions,reach,actions&date_preset=${datePreset}&access_token=${token}`, { cache: 'no-store' });
+          const cInsData = await cInsRes.json();
+          const ci = cInsData.data?.[0] || {};
+
+          // Contar leads das actions
+          let leads = 0;
+          if (ci.actions) {
+            for (const act of ci.actions) {
+              if (act.action_type === 'onsite_conversion.messaging_conversation_started_7d' ||
+                  act.action_type === 'onsite_conversion.messaging_first_reply' ||
+                  act.action_type === 'lead' ||
+                  act.action_type === 'offsite_conversion.fb_pixel_lead') {
+                leads += parseInt(act.value || 0);
+              }
+            }
+          }
+
+          return {
+            ...camp,
+            insights: {
+              spend: parseFloat(ci.spend || 0),
+              clicks: parseInt(ci.clicks || 0),
+              impressions: parseInt(ci.impressions || 0),
+              reach: parseInt(ci.reach || 0),
+              leads,
+              cpl: leads > 0 ? parseFloat(ci.spend || 0) / leads : 0
+            }
+          };
+        } catch (e) {
+          return { ...camp, insights: { spend: 0, clicks: 0, impressions: 0, reach: 0, leads: 0, cpl: 0 } };
+        }
+      });
+
+      const campaignsWithInsights = await Promise.all(campaignInsightsPromises);
+
       return new Response(JSON.stringify({ 
           success: true, 
-          campaigns: campData.data || [],
+          campaigns: campaignsWithInsights,
           insights: insData.data?.[0] || { spend: 0, clicks: 0, impressions: 0, reach: 0 }
       }), {
           headers: { ...MKT_CORS, "Content-Type": "application/json" },

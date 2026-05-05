@@ -34,6 +34,8 @@ export default function Reports() {
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [metaDatePreset, setMetaDatePreset] = useState('last_30d');
   const [isLoadingMeta, setIsLoadingMeta] = useState(false);
+  const [campaigns, setCampaigns] = useState([]);
+  const [selectedCampaignIds, setSelectedCampaignIds] = useState([]);
 
   const pdfRef = useRef(null);
 
@@ -122,6 +124,15 @@ export default function Reports() {
             }
           }
 
+          // Salvar campanhas com insights individuais
+          if (data.campaigns && data.campaigns.length > 0) {
+            setCampaigns(data.campaigns);
+            setSelectedCampaignIds(data.campaigns.map(c => c.id));
+          } else {
+            setCampaigns([]);
+            setSelectedCampaignIds([]);
+          }
+
           // Formatar o nome do período para preencher o input text
           let presetText = 'Últimos 30 Dias';
           if (metaDatePreset === 'last_7d') presetText = 'Últimos 7 Dias';
@@ -157,17 +168,28 @@ export default function Reports() {
       if (!session) return;
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
+      // Montar dados de campanhas para o prompt da IA
+      const selectedCamps = campaigns.filter(c => selectedCampaignIds.includes(c.id));
+      let campaignDetails = '';
+      if (selectedCamps.length > 0) {
+        campaignDetails = '\n\nDetalhamento por campanha:';
+        for (const c of selectedCamps) {
+          const ci = c.insights || {};
+          campaignDetails += `\n- ${c.name}: ${ci.leads || 0} leads, Invest R$ ${(ci.spend || 0).toFixed(2)}, CPL R$ ${(ci.cpl || 0).toFixed(2)}, Alcance ${ci.reach || 0}, Cliques ${ci.clicks || 0}`;
+        }
+      }
+
       const prompt = `Gere um Resumo Executivo (Insight) profissional e direto para um relatório de performance de tráfego pago (Meta Ads) do cliente "${manualData.clientName}".
 Dados do período (${manualData.period}):
-- Investimento: R$ ${manualData.spend}
-- Leads: ${manualData.leads}
+- Investimento Total: R$ ${manualData.spend}
+- Leads Totais: ${manualData.leads}
 - Alcance: ${manualData.reach}
 - Impressões: ${manualData.impressions}
-- Cliques: ${manualData.clicks}
+- Cliques: ${manualData.clicks}${campaignDetails}
 
 Escreva o texto dividido em 3 parágrafos curtos (com uma linha em branco entre eles para o texto ficar "respirável" e fácil de ler):
 1. Abertura animadora e premium com a visão geral do investimento e retorno.
-2. Destaque de um ponto forte e análise do custo (CPC/CPL).
+2. Destaque de um ponto forte e análise do custo (CPC/CPL). Se houver campanhas detalhadas, cite as que mais se destacaram.
 3. Sugestão estratégica clara para os próximos passos.
 Mantenha um tom estratégico, voltado para negócios e executivo. NÃO use formatação markdown (sem asteriscos * ou hashtags #), apenas texto limpo e quebras de linha normais.`;
 
@@ -346,6 +368,66 @@ Mantenha um tom estratégico, voltado para negócios e executivo. NÃO use forma
               </div>
             </div>
 
+            {/* Campanhas ativas com checkboxes */}
+            {campaigns.length > 0 && (
+              <div className="form-group" style={{ background: 'var(--brand-surface-01)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                <label className="form-label" style={{ marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>📊 Campanhas Ativas ({campaigns.length})</span>
+                  <span style={{ fontSize: '10px', color: 'var(--brand-muted)' }}>Selecione para o PDF</span>
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {campaigns.map(camp => {
+                    const ci = camp.insights || {};
+                    const isSelected = selectedCampaignIds.includes(camp.id);
+                    return (
+                      <label 
+                        key={camp.id} 
+                        style={{ 
+                          display: 'flex', alignItems: 'center', gap: '8px', 
+                          padding: '8px 10px', borderRadius: '6px', cursor: 'pointer',
+                          background: isSelected ? 'rgba(255,107,0,0.08)' : 'transparent',
+                          border: isSelected ? '1px solid rgba(255,107,0,0.3)' : '1px solid rgba(255,255,255,0.05)',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected} 
+                          onChange={() => {
+                            setSelectedCampaignIds(prev => 
+                              prev.includes(camp.id) 
+                                ? prev.filter(id => id !== camp.id) 
+                                : [...prev, camp.id]
+                            );
+                          }}
+                          style={{ accentColor: 'var(--brand-accent)' }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--brand-offwhite)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{camp.name}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--brand-muted)', display: 'flex', gap: '8px', marginTop: '2px' }}>
+                            <span>{ci.leads || 0} leads</span>
+                            <span>•</span>
+                            <span>R$ {(ci.spend || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                            <span>•</span>
+                            <span>CPL R$ {(ci.cpl || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+                {/* Total das selecionadas */}
+                {selectedCampaignIds.length > 0 && (
+                  <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--brand-accent)', fontWeight: 700 }}>
+                    <span>TOTAL ({selectedCampaignIds.length})</span>
+                    <span>
+                      {campaigns.filter(c => selectedCampaignIds.includes(c.id)).reduce((s, c) => s + (c.insights?.leads || 0), 0)} leads • R$ {campaigns.filter(c => selectedCampaignIds.includes(c.id)).reduce((s, c) => s + (c.insights?.spend || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="form-group">
               <label className="form-label">Marcas (Logos para PDF)</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-8)' }}>
@@ -465,6 +547,7 @@ Mantenha um tom estratégico, voltado para negócios e executivo. NÃO use forma
                   insightText={insightText}
                   agencyLogo={agencyLogoBase64}
                   clientLogo={clientLogoBase64}
+                  campaigns={campaigns.filter(c => selectedCampaignIds.includes(c.id))}
                 />
               </div>
             )}

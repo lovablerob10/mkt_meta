@@ -3,13 +3,18 @@ import React, { forwardRef } from 'react';
 const fmt = (n) => n ? n.toLocaleString('pt-BR') : '0';
 const fmtCurrency = (n) => n ? `R$ ${n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00';
 
-const PrintableReport = forwardRef(({ client, period, metrics, insightText, agencyLogo, clientLogo }, ref) => {
+const PrintableReport = forwardRef(({ client, period, metrics, insightText, agencyLogo, clientLogo, campaigns = [] }, ref) => {
+  const cellStyle = { padding: '8px 10px', fontSize: '11px', textAlign: 'left', borderBottom: '1px solid #E5E5E5', color: '#333' };
+  const cellBold = { ...cellStyle, fontWeight: 700, color: '#000' };
+  const cellRight = { ...cellStyle, textAlign: 'right' };
+  const cellRightBold = { ...cellRight, fontWeight: 700, color: '#000' };
+
   return (
     <div 
       ref={ref} 
       style={{
-        width: '794px', // A4 width at 96 PPI
-        height: '1123px', // A4 height at 96 PPI
+        width: '794px',
+        minHeight: '1123px',
         backgroundColor: '#FFFFFF',
         color: '#000000',
         fontFamily: 'Inter, system-ui, sans-serif',
@@ -45,23 +50,20 @@ const PrintableReport = forwardRef(({ client, period, metrics, insightText, agen
       </div>
 
       {/* Main KPIs */}
-      <div style={{ marginBottom: '40px' }}>
+      <div style={{ marginBottom: campaigns.length > 0 ? '24px' : '40px' }}>
         <h2 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #E5E5E5', paddingBottom: '8px', marginBottom: '20px', color: '#000000', fontWeight: '800' }}>Visão Geral de Resultados</h2>
         
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
-          {/* Card 1 */}
           <div style={{ border: '1px solid #E5E5E5', borderRadius: '8px', padding: '20px', backgroundColor: '#FAFAFA' }}>
             <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: '500' }}>Investimento Total</p>
             <p style={{ margin: '8px 0 0 0', fontSize: '28px', fontWeight: '900', color: '#000000' }}>{fmtCurrency(metrics?.spend)}</p>
           </div>
           
-          {/* Card 2 */}
           <div style={{ border: '1px solid #000', borderRadius: '8px', padding: '20px', backgroundColor: '#000', color: '#FFF' }}>
             <p style={{ margin: 0, fontSize: '12px', color: '#CCC', fontWeight: '500' }}>Leads Gerados</p>
             <p style={{ margin: '8px 0 0 0', fontSize: '28px', fontWeight: '900', color: '#FFFFFF' }}>{fmt(metrics?.leads)}</p>
           </div>
 
-          {/* Card 3 */}
           <div style={{ border: '1px solid #E5E5E5', borderRadius: '8px', padding: '20px', backgroundColor: '#FAFAFA' }}>
             <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: '500' }}>Custo por Lead (CPL)</p>
             <p style={{ margin: '8px 0 0 0', fontSize: '28px', fontWeight: '900', color: '#000000' }}>
@@ -71,25 +73,72 @@ const PrintableReport = forwardRef(({ client, period, metrics, insightText, agen
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginTop: '20px' }}>
-          {/* Card 4 */}
           <div style={{ border: '1px solid #E5E5E5', borderRadius: '8px', padding: '20px', backgroundColor: '#FAFAFA' }}>
             <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: '500' }}>Alcance</p>
             <p style={{ margin: '8px 0 0 0', fontSize: '20px', fontWeight: '800', color: '#000000' }}>{fmt(metrics?.reach)}</p>
           </div>
 
-          {/* Card 5 */}
           <div style={{ border: '1px solid #E5E5E5', borderRadius: '8px', padding: '20px', backgroundColor: '#FAFAFA' }}>
             <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: '500' }}>Impressões</p>
             <p style={{ margin: '8px 0 0 0', fontSize: '20px', fontWeight: '800', color: '#000000' }}>{fmt(metrics?.impressions)}</p>
           </div>
 
-          {/* Card 6 */}
           <div style={{ border: '1px solid #E5E5E5', borderRadius: '8px', padding: '20px', backgroundColor: '#FAFAFA' }}>
             <p style={{ margin: 0, fontSize: '12px', color: '#666', fontWeight: '500' }}>Cliques Totais</p>
             <p style={{ margin: '8px 0 0 0', fontSize: '20px', fontWeight: '800', color: '#000000' }}>{fmt(metrics?.clicks)}</p>
           </div>
         </div>
       </div>
+
+      {/* Campaign Breakdown Table */}
+      {campaigns.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <h2 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid #E5E5E5', paddingBottom: '8px', marginBottom: '16px', color: '#000000', fontWeight: '800' }}>Detalhamento por Campanha</h2>
+          
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#111', color: '#FFF' }}>
+                <th style={{ padding: '10px 10px', textAlign: 'left', fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Campanha</th>
+                <th style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Leads</th>
+                <th style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Investimento</th>
+                <th style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>CPL</th>
+                <th style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Alcance</th>
+                <th style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cliques</th>
+              </tr>
+            </thead>
+            <tbody>
+              {campaigns.map((camp, i) => {
+                const ci = camp.insights || {};
+                return (
+                  <tr key={camp.id} style={{ backgroundColor: i % 2 === 0 ? '#FAFAFA' : '#FFFFFF' }}>
+                    <td style={cellBold}>{camp.name}</td>
+                    <td style={cellRightBold}>{fmt(ci.leads)}</td>
+                    <td style={cellRight}>{fmtCurrency(ci.spend)}</td>
+                    <td style={cellRight}>{ci.leads > 0 ? fmtCurrency(ci.cpl) : '—'}</td>
+                    <td style={cellRight}>{fmt(ci.reach)}</td>
+                    <td style={cellRight}>{fmt(ci.clicks)}</td>
+                  </tr>
+                );
+              })}
+              {/* Total row */}
+              <tr style={{ backgroundColor: '#111', color: '#FFF' }}>
+                <td style={{ padding: '10px 10px', fontWeight: 800, fontSize: '11px' }}>TOTAL</td>
+                <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 800, fontSize: '11px' }}>{fmt(campaigns.reduce((s, c) => s + (c.insights?.leads || 0), 0))}</td>
+                <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: '11px' }}>{fmtCurrency(campaigns.reduce((s, c) => s + (c.insights?.spend || 0), 0))}</td>
+                <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: '11px' }}>
+                  {(() => {
+                    const totalLeads = campaigns.reduce((s, c) => s + (c.insights?.leads || 0), 0);
+                    const totalSpend = campaigns.reduce((s, c) => s + (c.insights?.spend || 0), 0);
+                    return totalLeads > 0 ? fmtCurrency(totalSpend / totalLeads) : '—';
+                  })()}
+                </td>
+                <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: '11px' }}>{fmt(campaigns.reduce((s, c) => s + (c.insights?.reach || 0), 0))}</td>
+                <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, fontSize: '11px' }}>{fmt(campaigns.reduce((s, c) => s + (c.insights?.clicks || 0), 0))}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Insight Section */}
       <div style={{ flex: 1 }}>
