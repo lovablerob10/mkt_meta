@@ -37,8 +37,7 @@ export default function Login() {
 
   const handleDevLogin = (roleKey) => {
     loginAs(roleKey);
-    const destinations = { master: '/', gestor: '/', cliente: '/client' };
-    navigate(destinations[roleKey]);
+    // LoginGuard detecta isAuthenticated=true e redireciona automaticamente
   };
 
   const DEV_ROLES = [
@@ -276,6 +275,61 @@ export default function Login() {
           </form>
         </div>
 
+        {/* Dev Login — Acesso rápido para desenvolvimento */}
+        <div style={{
+          marginTop: '20px',
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: '16px',
+          padding: '24px',
+        }}>
+          <div style={{
+            fontSize: '11px',
+            fontWeight: 600,
+            color: 'rgba(255,255,255,0.3)',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+            marginBottom: '14px',
+            textAlign: 'center',
+          }}>
+            ⚡ Modo Desenvolvimento
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {DEV_ROLES.map(({ key, icon: Icon, label, desc, color }) => (
+              <button
+                key={key}
+                onClick={() => handleDevLogin(key)}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '14px 8px',
+                  borderRadius: '12px',
+                  border: `1px solid ${color}30`,
+                  background: `${color}08`,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = `${color}18`;
+                  e.currentTarget.style.borderColor = `${color}50`;
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = `${color}08`;
+                  e.currentTarget.style.borderColor = `${color}30`;
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <Icon size={20} style={{ color }} />
+                <span style={{ fontSize: '12px', fontWeight: 700, color }}>{label}</span>
+                <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>{desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Footer */}
         <div style={{

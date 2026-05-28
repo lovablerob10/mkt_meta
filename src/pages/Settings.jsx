@@ -7,6 +7,7 @@ import {
 import { useAuth, ROLES } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import * as adminService from '../lib/adminService';
+import { MOCK_CLIENTS } from '../data/mockData';
 
 // ────────────────────────────────────────────────────────
 // TABS CONFIG
@@ -1070,6 +1071,9 @@ function IntegrationsTab() {
         )}
       </div>
 
+      {/* ── WhatsApp Business API ───────────────────────── */}
+      <WhatsAppIntegrationPanel />
+
       {/* App Info */}
       <div className="panel animate-in">
         <div className="panel-header">
@@ -1100,6 +1104,165 @@ function IntegrationsTab() {
         </div>
       </div>
     </>
+  );
+}
+
+// ════════════════════════════════════════════════════════
+// WHATSAPP BUSINESS API INTEGRATION PANEL
+// ════════════════════════════════════════════════════════
+function WhatsAppIntegrationPanel() {
+  const [copied, setCopied] = useState('');
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://nlgwoetmyqbdqdhgeidh.supabase.co';
+  const webhookUrl = `${supabaseUrl}/functions/v1/whatsapp-webhook`;
+  const verifyToken = 'ZMKT_WA_2026';
+
+  const handleCopy = (text, label) => {
+    navigator.clipboard.writeText(text);
+    setCopied(label);
+    setTimeout(() => setCopied(''), 2000);
+  };
+
+  return (
+    <div className="panel animate-in">
+      <div className="panel-header">
+        <div>
+          <div className="panel-subtitle">WhatsApp</div>
+          <div className="panel-title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
+            <MessageCircle size={20} style={{ color: '#25D366' }} />
+            WhatsApp Business API
+          </div>
+        </div>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: '6px',
+          padding: '4px 12px', borderRadius: 'var(--radius-full)',
+          background: 'rgba(34,197,94,0.12)', color: '#22C55E',
+          fontSize: '0.7rem', fontWeight: 700, fontFamily: 'var(--font-mono)',
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', animation: 'pulse-dot 2s infinite' }} />
+          CONFIGURADO
+        </span>
+      </div>
+
+      <p style={{
+        color: 'var(--brand-muted)', fontSize: 'var(--font-body-sm)',
+        marginBottom: 'var(--space-16)', maxWidth: 600,
+      }}>
+        Webhook para captura automática de leads via Click-to-WhatsApp (CTWA).
+        Os leads são salvos em tempo real e recebem scoring por IA.
+      </p>
+
+      {/* Webhook URL */}
+      <div style={{ marginBottom: 'var(--space-12)' }}>
+        <div style={{
+          fontSize: 'var(--font-caption)', color: 'var(--brand-muted)',
+          textTransform: 'uppercase', letterSpacing: 'var(--ls-label)',
+          marginBottom: 'var(--space-4)', fontWeight: 600,
+        }}>
+          Callback URL (Webhook)
+        </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 'var(--space-8)',
+          background: 'var(--brand-surface-02)', padding: 'var(--space-10) var(--space-16)',
+          borderRadius: 'var(--radius-md)', border: 'var(--border-subtle)',
+        }}>
+          <Link2 size={14} style={{ color: '#25D366', flexShrink: 0 }} />
+          <code style={{
+            flex: 1, fontSize: '0.75rem', fontFamily: 'var(--font-mono)',
+            color: 'var(--brand-offwhite-80)', wordBreak: 'break-all',
+          }}>
+            {webhookUrl}
+          </code>
+          <button
+            className="btn btn-ghost btn-sm"
+            style={{ padding: '4px 10px', fontSize: '0.65rem' }}
+            onClick={() => handleCopy(webhookUrl, 'url')}
+          >
+            {copied === 'url' ? <><Check size={12} /> Copiado!</> : <><Copy size={12} /> Copiar</>}
+          </button>
+        </div>
+      </div>
+
+      {/* Verify Token */}
+      <div style={{ marginBottom: 'var(--space-16)' }}>
+        <div style={{
+          fontSize: 'var(--font-caption)', color: 'var(--brand-muted)',
+          textTransform: 'uppercase', letterSpacing: 'var(--ls-label)',
+          marginBottom: 'var(--space-4)', fontWeight: 600,
+        }}>
+          Verify Token
+        </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 'var(--space-8)',
+          background: 'var(--brand-surface-02)', padding: 'var(--space-10) var(--space-16)',
+          borderRadius: 'var(--radius-md)', border: 'var(--border-subtle)',
+        }}>
+          <Shield size={14} style={{ color: 'var(--brand-accent)', flexShrink: 0 }} />
+          <code style={{
+            flex: 1, fontSize: '0.75rem', fontFamily: 'var(--font-mono)',
+            color: 'var(--brand-offwhite-80)',
+          }}>
+            {verifyToken}
+          </code>
+          <button
+            className="btn btn-ghost btn-sm"
+            style={{ padding: '4px 10px', fontSize: '0.65rem' }}
+            onClick={() => handleCopy(verifyToken, 'token')}
+          >
+            {copied === 'token' ? <><Check size={12} /> Copiado!</> : <><Copy size={12} /> Copiar</>}
+          </button>
+        </div>
+      </div>
+
+      {/* Info Cards */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+        gap: 'var(--space-12)', marginBottom: 'var(--space-16)',
+      }}>
+        {[
+          { label: 'Evento Subscrito', value: 'messages', color: '#25D366' },
+          { label: 'Scoring IA', value: 'GPT-4o Mini', color: 'var(--brand-accent)' },
+          { label: 'Leads Storage', value: 'whatsapp_leads', color: 'var(--brand-blue-light)' },
+          { label: 'Realtime', value: 'Ativo', color: '#22C55E' },
+        ].map(({ label, value, color }) => (
+          <div key={label} style={{
+            background: 'var(--brand-surface-02)', borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-12)', border: 'var(--border-subtle)',
+          }}>
+            <div style={{
+              fontSize: '0.6rem', color: 'var(--brand-muted)', textTransform: 'uppercase',
+              letterSpacing: 'var(--ls-label)', marginBottom: 4, fontWeight: 600,
+            }}>
+              {label}
+            </div>
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: '0.8rem',
+              color: color, fontWeight: 700,
+            }}>
+              {value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Setup Instructions */}
+      <div style={{
+        padding: 'var(--space-16)', background: 'rgba(37,211,102,0.06)',
+        border: '1px solid rgba(37,211,102,0.15)', borderRadius: 'var(--radius-md)',
+        fontSize: 'var(--font-body-sm)', color: 'var(--brand-offwhite-80)',
+      }}>
+        <strong style={{ color: '#25D366', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: 'var(--space-8)' }}>
+          <MessageCircle size={14} /> Configuração no Meta for Developers
+        </strong>
+        <ol style={{ paddingLeft: '1.2em', margin: 0, lineHeight: 1.8, fontSize: '0.8rem' }}>
+          <li>Acesse <strong>Meta for Developers</strong> → App → WhatsApp → Configuration</li>
+          <li>Em <strong>Webhook</strong>, clique em <em>Edit</em></li>
+          <li>Cole a <strong>Callback URL</strong> acima</li>
+          <li>Cole o <strong>Verify Token</strong> acima</li>
+          <li>Subscreva o campo: <code style={{ color: '#25D366' }}>messages</code></li>
+          <li>Adicione o número de telefone da API</li>
+        </ol>
+      </div>
+    </div>
   );
 }
 

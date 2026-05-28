@@ -163,8 +163,9 @@ export function AuthProvider({ children }) {
   }, [loadProfile]);
 
   // Login real via Supabase
+  // NOTA: NÃO usar setIsLoading aqui! isLoading é só para boot inicial.
+  // Login.jsx já tem seu próprio state "submitting" para feedback visual.
   const login = useCallback(async (email, password) => {
-    setIsLoading(true);
 
     if (!SUPABASE_CONFIGURED) {
       // Fallback: mock login
@@ -174,10 +175,8 @@ export function AuthProvider({ children }) {
       );
       if (found) {
         setUser(found);
-        setIsLoading(false);
         return { success: true, user: found };
       }
-      setIsLoading(false);
       return { success: false, error: 'Credenciais inválidas' };
     }
 
@@ -189,7 +188,6 @@ export function AuthProvider({ children }) {
       });
 
       if (error) {
-        setIsLoading(false);
         let msg = error.message;
         if (msg === 'Invalid login credentials') msg = 'E-mail ou senha incorretos.';
         return { success: false, error: msg };
@@ -199,15 +197,12 @@ export function AuthProvider({ children }) {
       const userProfile = await loadProfile(data.user);
 
       if (!userProfile) {
-        setIsLoading(false);
         return { success: false, error: 'Perfil não encontrado. Contate o administrador.' };
       }
 
-      setIsLoading(false);
       return { success: true, user: userProfile };
     } catch (err) {
       console.error('[ZMKT] Erro no login:', err);
-      setIsLoading(false);
       return { success: false, error: 'Erro ao conectar. Tente novamente.' };
     }
   }, [loadProfile]);
