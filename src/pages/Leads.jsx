@@ -542,119 +542,181 @@ function ConversationDrawer({ lead, messages, loading, onClose }) {
         {/* Header */}
         <div style={{
           padding: 'var(--space-16) var(--space-20)',
-          borderBottom: 'var(--border-subtle)',
-          display: 'flex', alignItems: 'center', gap: 'var(--space-12)',
-          background: 'rgba(255,255,255,0.02)',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
+          display: 'flex', alignItems: 'center', gap: 'var(--space-16)',
+          background: 'rgba(15, 23, 42, 0.7)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          position: 'relative', zIndex: 10,
         }}>
-          <button onClick={onClose} className="btn btn-ghost btn-sm" style={{ padding: 6 }}>
+          <button onClick={onClose} className="btn btn-ghost btn-sm" style={{ padding: 8, background: 'rgba(255,255,255,0.05)', borderRadius: '50%' }}>
             <ArrowLeft size={18} />
           </button>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 'var(--font-body-md)', color: 'var(--brand-offwhite)' }}>
+          
+          <div style={{
+            width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+            background: `linear-gradient(135deg, ${scoreConf.color}40, ${scoreConf.color}80)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--brand-offwhite)', fontWeight: 'bold', fontSize: '1rem',
+            boxShadow: `0 0 10px ${scoreConf.color}30`
+          }}>
+            {lead.display_name ? lead.display_name.charAt(0).toUpperCase() : 'U'}
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--brand-offwhite)', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {lead.display_name || 'Lead Anônimo'}
             </div>
-            <div style={{ fontSize: 'var(--font-caption)', color: 'var(--brand-muted)',
-              display: 'flex', alignItems: 'center', gap: 'var(--space-8)' }}>
-              <Phone size={10} /> {formatPhone(lead.phone)}
+            <div style={{ fontSize: '0.75rem', color: 'var(--brand-muted)',
+              display: 'flex', alignItems: 'center', gap: 'var(--space-8)', marginTop: 2 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Phone size={10} /> {formatPhone(lead.phone)}
+              </span>
               {lead.ad_title && (
-                <><span style={{ opacity: 0.3 }}>•</span><Megaphone size={10} style={{ color: 'var(--brand-accent)' }} /> {lead.ad_title}</>
+                <>
+                  <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'var(--brand-muted-deep)' }} />
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--brand-accent-light)' }}>
+                    <Megaphone size={10} /> <span style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.ad_title}</span>
+                  </span>
+                </>
               )}
             </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px',
-            borderRadius: 'var(--radius-full)', background: scoreConf.bg,
-            border: `1px solid ${scoreConf.border}`, color: scoreConf.color,
-            fontSize: '0.7rem', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-            <ScoreIcon size={12} /> {lead.score_label} {lead.score}
           </div>
         </div>
 
-        {/* AI Analysis */}
-        {lead.score_reason && (
-          <div style={{
-            padding: 'var(--space-10) var(--space-20)',
-            background: scoreConf.bg, borderBottom: `1px solid ${scoreConf.border}`,
-            fontSize: '0.75rem', color: scoreConf.color,
-            display: 'flex', alignItems: 'center', gap: 'var(--space-8)',
-          }}>
-            <Zap size={12} style={{ flexShrink: 0 }} />
-            IA: {lead.score_reason}
-          </div>
-        )}
-
-        {/* Messages */}
+        {/* Messages Container */}
         <div style={{
-          flex: 1, overflow: 'auto', padding: 'var(--space-20)',
-          display: 'flex', flexDirection: 'column', gap: 'var(--space-12)',
-          background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, transparent 100%)',
+          flex: 1, overflow: 'auto',
+          display: 'flex', flexDirection: 'column',
+          background: 'var(--brand-bg)',
+          backgroundImage: 'radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
         }}>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: 'var(--space-32)', color: 'var(--brand-muted)' }}>
-              <Loader size={24} style={{ animation: 'spin 1s linear infinite' }} />
-              <div style={{ marginTop: 'var(--space-8)', fontSize: 'var(--font-body-sm)' }}>Carregando conversa...</div>
-            </div>
-          ) : messages.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 'var(--space-32)' }}>
-              <MessageCircle size={32} style={{ color: 'var(--brand-muted-deep)', marginBottom: 'var(--space-8)' }} />
-              <div style={{ color: 'var(--brand-muted)', fontSize: 'var(--font-body-sm)' }}>
-                Histórico de mensagens não disponível.
+          {/* AI Analysis Floating Card */}
+          {lead.score_reason && (
+            <div style={{
+              margin: 'var(--space-16) var(--space-20)',
+              padding: 'var(--space-12) var(--space-16)',
+              background: `linear-gradient(to right, rgba(255,255,255,0.03), rgba(0,0,0,0.2))`,
+              border: '1px solid rgba(255,255,255,0.05)',
+              borderLeft: `3px solid ${scoreConf.color}`,
+              borderRadius: 'var(--radius-md)',
+              fontSize: '0.8rem', color: 'var(--brand-offwhite-80)',
+              display: 'flex', alignItems: 'flex-start', gap: 'var(--space-12)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+              backdropFilter: 'blur(8px)',
+            }}>
+              <div style={{ 
+                background: scoreConf.color, color: '#000', padding: 4, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2,
+                boxShadow: `0 0 10px ${scoreConf.color}60`
+              }}>
+                <Zap size={10} fill="#000" />
               </div>
-              {lead.first_message && (
-                <div style={{
-                  marginTop: 'var(--space-16)', padding: 'var(--space-12) var(--space-16)',
-                  background: 'rgba(37,211,102,0.08)', borderRadius: 'var(--radius-lg)',
-                  border: '1px solid rgba(37,211,102,0.15)', textAlign: 'left',
-                  fontSize: '0.85rem', color: 'var(--brand-offwhite-80)', fontStyle: 'italic',
-                }}>
-                  "{lead.first_message}"
+              <div style={{ flex: 1, lineHeight: 1.5 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <strong style={{ color: scoreConf.color, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Análise de Intenção
+                  </strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px',
+                    borderRadius: 'var(--radius-full)', background: scoreConf.bg,
+                    border: `1px solid ${scoreConf.border}`, color: scoreConf.color,
+                    fontSize: '0.65rem', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
+                    <ScoreIcon size={10} /> {lead.score_label} {lead.score}
+                  </div>
                 </div>
-              )}
-            </div>
-          ) : (
-            <>
-              {/* Date header */}
-              <div style={{ textAlign: 'center', fontSize: '0.65rem', color: 'var(--brand-muted-deep)',
-                padding: '4px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-full)',
-                alignSelf: 'center', marginBottom: 'var(--space-4)' }}>
-                {new Date(messages[0]?.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                <div style={{ fontSize: '0.85rem' }}>{lead.score_reason}</div>
               </div>
-              {messages.map((msg, i) => (
-                <div key={msg.id || i} style={{
-                  display: 'flex', flexDirection: 'column',
-                  alignItems: msg.direction === 'outbound' ? 'flex-end' : 'flex-start',
-                  maxWidth: '85%',
-                  alignSelf: msg.direction === 'outbound' ? 'flex-end' : 'flex-start',
-                }}>
+            </div>
+          )}
+
+          {/* Messages Wrapper */}
+          <div style={{ padding: '0 var(--space-20) var(--space-20)', display: 'flex', flexDirection: 'column', gap: 'var(--space-12)' }}>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: 'var(--space-32)', color: 'var(--brand-muted)' }}>
+                <Loader size={24} style={{ animation: 'spin 1s linear infinite' }} />
+                <div style={{ marginTop: 'var(--space-8)', fontSize: 'var(--font-body-sm)' }}>Sincronizando conversas...</div>
+              </div>
+            ) : messages.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 'var(--space-32)' }}>
+                <MessageCircle size={32} style={{ color: 'var(--brand-muted-deep)', marginBottom: 'var(--space-8)' }} />
+                <div style={{ color: 'var(--brand-muted)', fontSize: 'var(--font-body-sm)' }}>
+                  Histórico de mensagens não disponível.
+                </div>
+                {lead.first_message && (
                   <div style={{
-                    padding: 'var(--space-10) var(--space-14)',
-                    borderRadius: msg.direction === 'outbound'
-                      ? '16px 16px 4px 16px'
-                      : '16px 16px 16px 4px',
-                    background: msg.direction === 'outbound'
-                      ? 'rgba(37,211,102,0.12)'
-                      : 'rgba(255,255,255,0.06)',
-                    border: msg.direction === 'outbound'
-                      ? '1px solid rgba(37,211,102,0.2)'
-                      : '1px solid rgba(255,255,255,0.08)',
-                    fontSize: '0.85rem',
-                    color: 'var(--brand-offwhite-80)',
-                    lineHeight: 1.5,
-                    wordBreak: 'break-word',
+                    marginTop: 'var(--space-16)', padding: 'var(--space-12) var(--space-16)',
+                    background: 'rgba(30, 41, 59, 0.6)', borderRadius: '18px 18px 18px 4px',
+                    border: '1px solid rgba(255,255,255,0.05)', textAlign: 'left',
+                    fontSize: '0.85rem', color: 'var(--brand-offwhite-80)', fontStyle: 'italic',
+                    alignSelf: 'flex-start', maxWidth: '85%'
                   }}>
-                    {msg.message_type !== 'text' && (
-                      <div style={{ fontSize: '0.7rem', color: 'var(--brand-muted)', marginBottom: 4,
-                        fontStyle: 'italic' }}>
-                        📎 {msg.message_type}
-                      </div>
-                    )}
-                    {msg.content}
+                    "{lead.first_message}"
                   </div>
-                  <div style={{ fontSize: '0.6rem', color: 'var(--brand-muted-deep)',
-                    marginTop: 3, padding: '0 4px' }}>
-                    {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Date header */}
+                <div style={{ textAlign: 'center', margin: 'var(--space-8) 0' }}>
+                  <span style={{
+                    fontSize: '0.65rem', color: 'var(--brand-muted)',
+                    padding: '4px 12px', background: 'rgba(255,255,255,0.04)', 
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 'var(--radius-full)', fontWeight: 500, letterSpacing: '0.02em',
+                    backdropFilter: 'blur(4px)',
+                  }}>
+                    {new Date(messages[0]?.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  </span>
                 </div>
-              ))}
+              {messages.map((msg, i) => {
+                const isOut = msg.direction === 'outbound';
+                return (
+                  <div key={msg.id || i} style={{
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: isOut ? 'flex-end' : 'flex-start',
+                    maxWidth: '85%',
+                    alignSelf: isOut ? 'flex-end' : 'flex-start',
+                  }}>
+                    <div style={{
+                      padding: '10px 14px',
+                      borderRadius: isOut ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                      background: isOut 
+                        ? 'linear-gradient(135deg, rgba(37,211,102,0.9) 0%, rgba(21,163,74,0.9) 100%)' 
+                        : 'rgba(30, 41, 59, 0.85)',
+                      border: isOut 
+                        ? '1px solid rgba(37,211,102,0.3)'
+                        : '1px solid rgba(255,255,255,0.08)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      backdropFilter: isOut ? 'none' : 'blur(8px)',
+                      WebkitBackdropFilter: isOut ? 'none' : 'blur(8px)',
+                      fontSize: '0.9rem',
+                      color: isOut ? '#fff' : 'var(--brand-offwhite)',
+                      lineHeight: 1.45,
+                      wordBreak: 'break-word',
+                      position: 'relative',
+                    }}>
+                      {msg.message_type !== 'text' && (
+                        <div style={{ fontSize: '0.75rem', color: isOut ? 'rgba(255,255,255,0.8)' : 'var(--brand-muted)', marginBottom: 4, fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 12 }}>📎</span> {msg.message_type}
+                        </div>
+                      )}
+                      {msg.content}
+                      
+                      <div style={{ 
+                        fontSize: '0.65rem', 
+                        color: isOut ? 'rgba(255,255,255,0.7)' : 'var(--brand-muted)',
+                        marginTop: 4, 
+                        display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4,
+                        float: 'right', marginLeft: 12, transform: 'translateY(2px)'
+                      }}>
+                        {new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        {isOut && <span style={{ fontSize: 10 }}>✓✓</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </>
           )}
         </div>
